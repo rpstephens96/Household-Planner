@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Home Hub" />
+  <title>Home Hub · Household Organiser</title>
+
+  <!-- Tailwind CSS (CDN – no build step needed for GitHub Pages) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (window.tailwind) tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'] }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Lucide icons (CDN) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <style>
+    html { -webkit-tap-highlight-color: transparent; }
+    body { overscroll-behavior-y: none; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    @keyframes slideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .anim-up { animation: slideUp .22s ease-out; }
+    .anim-fade { animation: fadeIn .18s ease-out; }
+    details > summary { list-style: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] .chev { transform: rotate(180deg); }
+    i[data-lucide] { display: inline-block; }
+    code { font-size: 12px; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 antialiased font-sans">
+  <div class="min-h-screen md:flex">
+
+    <!-- ============ DESKTOP SIDEBAR ============ -->
+    <aside class="hidden md:flex md:flex-col w-64 shrink-0 bg-white border-r border-slate-200 h-screen sticky top-0">
+      <div class="px-6 py-6 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center shadow-sm">
+          <i data-lucide="house" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <p class="font-bold text-slate-900 leading-tight">Home Hub</p>
+          <p class="text-xs text-slate-500">Household organiser</p>
+        </div>
+      </div>
+      <nav id="side-nav" class="flex-1 px-3 space-y-1"></nav>
+      <div class="p-4 border-t border-slate-100">
+        <button type="button" data-action="open-backup" class="w-full flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700">
+          <span id="sync-indicator-side"></span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN COLUMN ============ -->
+    <div class="flex-1 min-w-0 flex flex-col">
+      <header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200/70">
+        <div class="max-w-6xl mx-auto px-4 md:px-8 h-16 flex items-center gap-3">
+          <div class="md:hidden w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center">
+            <i data-lucide="house" class="w-5 h-5"></i>
+          </div>
+          <h1 id="page-title" class="text-lg md:text-xl font-semibold text-slate-900 flex-1 truncate">Home</h1>
+          <span id="sync-indicator-head" class="hidden sm:inline-flex"></span>
+          <button type="button" data-action="open-backup"
+            class="inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 text-sm font-medium shadow-sm transition">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i><span class="hidden sm:inline">Backup / Sync</span><span class="sm:hidden">Sync</span>
+          </button>
+          <a href="#/settings" class="md:hidden w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-600" aria-label="Settings">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </a>
+        </div>
+      </header>
+
+      <main id="view" class="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 pt-5 md:pt-8 pb-32 md:pb-12"></main>
+    </div>
+  </div>
+
+  <!-- ============ MOBILE BOTTOM NAV ============ -->
+  <nav id="bottom-nav" class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom">
+    <div id="bottom-nav-inner" class="grid grid-cols-5"></div>
+  </nav>
+
+  <!-- ============ QUICK-ADD FLOATING BUTTON ============ -->
+  <button type="button" data-action="open-quickadd" aria-label="Quick add"
+    class="fixed z-30 right-4 bottom-24 md:bottom-8 md:right-8 w-14 h-14 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-lg shadow-teal-600/30 flex items-center justify-center transition active:scale-95">
+    <i data-lucide="plus" class="w-7 h-7"></i>
+  </button>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="fixed z-[60] inset-x-0 bottom-24 md:bottom-8 flex flex-col items-center gap-2 pointer-events-none px-4"></div>
+  <input type="file" id="import-file" accept="application/json,.json" class="hidden" />
+
+<script>
+'use strict';
+/* =====================================================================
+   HOME HUB – single-file household organiser
+   ---------------------------------------------------------------------
+   Sections:
+     1. Constants & configuration
+     2. Utility helpers (dates, money, escaping)
+     3. State: defaults, sample data, load / save / normalise
+     4. Domain helpers (birthdays, Christmas stats, renewals)
+     5. UI primitives (icons, pills, inputs, modal, toast)
+     6. Views: Dashboard, Tasks, Birthdays, Christmas, Vault, Settings
+     7. Forms (modals)
+     8. Backup: export / import / share
+     9. Cloud sync (Firebase Realtime DB via REST+SSE, or Supabase REST)
+    10. Actions & event delegation
+    11. Router & boot
+   ===================================================================== */
+
+/* =========================== 1. CONSTANTS =========================== */
+const STORE_KEY  = 'homehub.data.v1';
+const CLIENT_KEY = 'homehub.clientId';
+const CLIENT_ID  = localStorage.getItem(CLIENT_KEY) || (() => {
+  const id = 'c_' + Math.random().toString(36).slice(2, 10);
+  localStorage.setItem(CLIENT_KEY, id);
+  return id;
+})();
+
+const NAV = [
+  { id: 'dashboard', label: 'Home',      icon: 'house' },
+  { id: 'tasks',     label: 'Tasks',     icon: 'list-checks' },
+  { id: 'birthdays', label: 'Birthdays', icon: 'cake' },
+  { id: 'christmas', label: 'Christmas', icon: 'tree-pine' },
+  { id: 'vault',     label: 'Vault',     icon: 'shield-check' },
+  { id: 'settings',  label: 'Settings',  icon: 'settings', desktopOnly: true }
+];
+const TITLES = { dashboard: 'Home', tasks: 'Tasks & Checklists', birthdays: 'Birthdays', christmas: 'Christmas Planner', vault: 'Household Vault', settings: 'Settings' };
+
+const PRIORITIES = {
+  high:   { label: 'High',   cls: 'bg-rose-50 text-rose-700 ring-rose-200',    rank: 0 },
+  medium: { label: 'Medium', cls: 'bg-amber-50 text-amber-700 ring-amber-200', rank: 1 },
+  low:    { label: 'Low',    cls: 'bg-sky-50 text-sky-700 ring-sky-200',       rank: 2 }
+};
+const TASK_CATS = { general: 'General', household: 'Household', errands: 'Errands' };
+
+const GIFT_STATUS = [
+  { id: 'idea',    label: 'Idea only',       icon: 'lightbulb' },
+  { id: 'ordered', label: 'Ordered',         icon: 'package' },
+  { id: 'ready',   label: 'Wrapped / Ready', icon: 'gift' }
+];
+
+const XMAS_STATUS = [
+  { id: 'notstarted', label: 'Not started', cls: 'bg-slate-100 text-slate-600 ring-slate-200' },
+  { id: 'idea',       label: 'Idea',        cls: 'bg-sky-50 text-sky-700 ring-sky-200' },
+  { id: 'purchased',  label: 'Purchased',   cls: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  { id: 'delivered',  label: 'Delivered',   cls: 'bg-violet-50 text-violet-700 ring-violet-200' },
+  { id: 'wrapped',    label: 'Wrapped',     cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200' }
+];
+const XMAS_IDX = Object.fromEntries(XMAS_STATUS.map((s, i) => [s.id, i]));
+const XMAS_BOUGHT_IDX = XMAS_IDX.purchased; // purchased or beyond counts as "spent"
+
+const VAULT_CATS = [
+  { id: 'mortgage',    label: 'Mortgages',               icon: 'landmark',    bg: 'bg-indigo-50',  fg: 'text-indigo-600' },
+  { id: 'home',        label: 'Home Insurance',          icon: 'house',       bg: 'bg-teal-50',    fg: 'text-teal-600' },
+  { id: 'car',         label: 'Car Insurance',           icon: 'car',         bg: 'bg-sky-50',     fg: 'text-sky-600' },
+  { id: 'life',        label: 'Life / Health Insurance', icon: 'heart-pulse', bg: 'bg-rose-50',    fg: 'text-rose-600' },
+  { id: 'utilities',   label: 'Utilities / Broadband',   icon: 'wifi',        bg: 'bg-amber-50',   fg: 'text-amber-600' },
+  { id: 'investments', label: 'Investments / Savings',   icon: 'piggy-bank',  bg: 'bg-emerald-50', fg: 'text-emerald-600' },
+  { id: 'other',       label: 'Other',                   icon: 'folder',      bg: 'bg-slate-100',  fg: 'text-slate-600' }
+];
+const VAULT_CAT = Object.fromEntries(VAULT_CATS.map(c => [c.id, c]));
+
+/* ========================= 2. UTILITY HELPERS ======================== */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const GBP = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+const money = n => GBP.format(Number(n) || 0);
+const num = v => { const n = parseFloat(String(v ?? '').replace(/[£,\s]/g, '')); return isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+const sum = (arr, f) => arr.reduce((t, x) => t + (f ? f(x) : x), 0);
+const byId = (arr, id) => arr.find(x => x.id === id);
+const touch = o => { if (o) o.updatedAt = Date.now(); return o; };
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+const todayStr = () => ymd(new Date());
+function parseYMD(s) { if (!s) return null; const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parseYMD(s); d.setDate(d.getDate() + n); return ymd(d); }
+function daysUntil(s) { if (!s) return null; return Math.round((parseYMD(s) - parseYMD(todayStr())) / 864e5); }
+function fmtDate(s, opts) { if (!s) return '—'; return parseYMD(s).toLocaleDateString('en-GB', opts || { day: 'numeric', month: 'short', year: 'numeric' }); }
+const isLeap = y => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+function relDays(d) {
+  if (d === null) return '';
+  if (d === 0) return 'Today';
+  if (d === 1) return 'Tomorrow';
+  if (d === -1) return 'Yesterday';
+  return d < 0 ? `${-d} days ago` : `in ${d} days`;
+}
+function safeUrl(u) {
+  u = String(u || '').trim();
+  if (!u) return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(u)) return 'https://' + u;
+  return '';
+}
+function initials(n) { return String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?'; }
+const AVATAR_COLOURS = ['bg-teal-100 text-teal-700', 'bg-sky-100 text-sky-700', 'bg-violet-100 text-violet-700', 'bg-rose-100 text-rose-700', 'bg-amber-100 text-amber-700', 'bg-emerald-100 text-emerald-700', 'bg-indigo-100 text-indigo-700'];
+function avatarCls(name) { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return AVATAR_COLOURS[h % AVATAR_COLOURS.length]; }
+
+/* ===================== 3. STATE: DEFAULTS & STORAGE ==================== */
+function defaultState() {
+  return {
+    version: 1,
+    tasks: [],
+    checklists: [],
+    people: [],
+    christmas: { year: new Date().getFullYear(), budget: 0, recipients: [], archive: [] },
+    vault: [],
+    settings: { sync: { enabled: false, provider: 'firebase', url: '', key: '', householdId: '', lastSync: null } },
+    meta: { updatedAt: Date.now(), updatedBy: CLIENT_ID }
+  };
+}
+
+/** Realistic sample data, with dates relative to "today" so every feature is testable immediately. */
+function sampleState() {
+  const s = defaultState();
+  const t = todayStr();
+  const y = new Date().getFullYear();
+  const S = { sample: true };
+  // DOB such that the next birthday is `offset` days away and they are turning `age`
+  const dobFor = (offset, age) => { const d = addDays(t, offset); return (Number(d.slice(0, 4)) - age) + d.slice(4); };
+
+  s.tasks = [
+    { id: uid(), title: 'Book MOT for the Golf', due: t, priority: 'high', category: 'errands', notes: 'Kwik Fit or the garage on the high street', done: false, ...S },
+    { id: uid(), title: 'Renew TV licence', due: addDays(t, -2), priority: 'medium', category: 'household', notes: '', done: false, ...S },
+    { id: uid(), title: 'Clear the gutters before winter', due: addDays(t, 5), priority: 'low', category: 'household', notes: '', done: false, ...S },
+    { id: uid(), title: 'Return parcel to Amazon locker', due: '', priority: 'medium', category: 'errands', notes: '', done: true, ...S }
+  ];
+
+  const items = arr => arr.map(([text, done]) => ({ id: uid(), text, done: !!done }));
+  s.checklists = [
+    { id: uid(), title: 'Holiday Packing', reusable: true, ...S, items: items([['Passports (check expiry!)', 1], ['GHIC cards', 1], ['Travel insurance documents', 0], ['Plug adaptors', 0], ['Suncream', 0], ['Phone chargers & power bank', 0]]) },
+    { id: uid(), title: 'Weekly Food Shop', reusable: true, ...S, items: items([['Milk', 0], ['Bread', 0], ['Eggs', 1], ['Bananas', 0], ['Chicken thighs', 0], ['Pasta', 0]]) },
+    { id: uid(), title: 'Spare room redecoration', reusable: false, ...S, items: items([['Choose paint colour', 1], ['Buy paint & rollers', 1], ['Fill holes & sand', 0], ['Paint ceiling', 0], ['Paint walls', 0]]) }
+  ];
+
+  const mumId = uid(), jamesId = uid(), sophieId = uid();
+  const idea = (title, price, link) => ({ id: uid(), title, price, link: link || '' });
+  const mumIdeas = [idea('Afternoon tea for two voucher', 45, 'https://www.virginexperiencedays.co.uk'), idea('Cashmere scarf', 60, 'https://www.johnlewis.com')];
+  s.people = [
+    { id: mumId, name: 'Margaret (Mum)', relationship: 'Mother', dob: dobFor(9, 64), yearKnown: true, notes: 'Loves gardening and Agatha Christie', ...S,
+      ideas: mumIdeas, finalGift: { title: mumIdeas[0].title, price: 45, status: 'ordered', ideaId: mumIdeas[0].id },
+      cardBought: true, cardSent: false,
+      history: [
+        { id: uid(), year: y - 1, occasion: 'Birthday', gift: 'Garden kneeler & gloves set', price: 25, notes: '' },
+        { id: uid(), year: y - 1, occasion: 'Christmas', gift: 'Jo Malone candle', price: 55, notes: 'She loved it' }
+      ] },
+    { id: jamesId, name: 'James Carter', relationship: 'Brother', dob: dobFor(24, 31), yearKnown: true, notes: '', ...S,
+      ideas: [idea('Lego Technic set', 90, 'https://www.lego.com/en-gb'), idea('Craft beer subscription', 30, '')],
+      finalGift: null, cardBought: false, cardSent: false,
+      history: [{ id: uid(), year: y - 1, occasion: 'Birthday', gift: 'Football shirt', price: 70, notes: '' }] },
+    { id: sophieId, name: 'Sophie (niece)', relationship: 'Niece', dob: dobFor(75, 8), yearKnown: true, notes: 'Into horses and drawing', ...S,
+      ideas: [idea('Art set with easel', 35, '')],
+      finalGift: { title: 'Art set with easel', price: 35, status: 'ready', ideaId: null },
+      cardBought: true, cardSent: false, history: [] }
+  ];
+  s.people.forEach(p => { p.cycleFor = nextBirthday(p).date; });
+
+  s.christmas = {
+    year: y, budget: 800, archive: [], sampleBudget: true,
+    recipients: [
+      { id: uid(), name: 'Margaret (Mum)', personId: mumId, budget: 100, notes: '', ...S, gifts: [
+        { id: uid(), title: 'Personalised photo book', price: 40, status: 'purchased', link: '' },
+        { id: uid(), title: 'Box of Thorntons', price: 12, status: 'idea', link: '' }] },
+      { id: uid(), name: 'James Carter', personId: jamesId, budget: 60, notes: '', ...S, gifts: [
+        { id: uid(), title: 'Whisky tasting set', price: 45, status: 'wrapped', link: '' }] },
+      { id: uid(), name: 'Mrs Patel (Sophie\'s teacher)', personId: null, budget: 15, notes: 'Christmas-only recipient', ...S, gifts: [
+        { id: uid(), title: 'Candle & thank-you card', price: 12, status: 'notstarted', link: '' }] },
+      { id: uid(), name: 'Secret Santa (work)', personId: null, budget: 10, notes: '£10 limit', ...S, gifts: [
+        { id: uid(), title: 'Desk plant', price: 10, status: 'delivered', link: '' }] }
+    ]
+  };
+
+  s.vault = [
+    { id: uid(), category: 'mortgage', name: 'Main residential mortgage', provider: 'Nationwide', accountNo: 'NW-4458-2219', renewalDate: addDays(t, 210), cost: 1150, costPeriod: 'monthly', autoRenew: false,
+      location: 'Blue folder in study filing cabinet – "Mortgage" divider', url: 'https://www.nationwide.co.uk', notes: '5-year fix at 4.29%. Reverts to SVR after end date – speak to broker 6 months before.', ...S },
+    { id: uid(), category: 'home', name: 'Buildings & contents', provider: 'Aviva', accountNo: 'AV-HH-99321', renewalDate: addDays(t, 40), cost: 420, costPeriod: 'annual', autoRenew: true,
+      location: 'Joint Gmail – search "Aviva"', url: 'https://www.aviva.co.uk/myaviva', notes: 'Excess: £100 compulsory + £250 voluntary. Accidental damage included.', ...S },
+    { id: uid(), category: 'car', name: 'VW Golf – comprehensive', provider: 'Admiral', accountNo: 'P12345678', renewalDate: addDays(t, 10), cost: 38, costPeriod: 'monthly', autoRenew: true,
+      location: '1Password Shared Vault – "Car insurance" item', url: 'https://www.admiral.com', notes: 'Excess £350. Named drivers: both of us. Check renewal quote vs comparison sites.', ...S },
+    { id: uid(), category: 'utilities', name: 'Broadband (fibre 500)', provider: 'BT', accountNo: 'BT-77120044', renewalDate: addDays(t, 120), cost: 42.99, costPeriod: 'monthly', autoRenew: true,
+      location: 'Joint Gmail – label "Bills"', url: 'https://www.bt.com/mybt', notes: '30 days\' notice to cancel once out of contract.', ...S },
+    { id: uid(), category: 'life', name: 'Joint term life cover', provider: 'Legal & General', accountNo: 'LG-889023', renewalDate: '', cost: 24.5, costPeriod: 'monthly', autoRenew: true,
+      location: 'Fireproof box under the stairs', url: 'https://www.legalandgeneral.com', notes: '25-year term, decreasing cover linked to mortgage.', ...S }
+  ];
+  return s;
+}
+
+let state;
+let ui = {
+  taskFilter: 'open', taskCat: 'all', tasksTab: 'tasks',
+  clCollapsed: {}, personOpen: {},
+  xmasFilter: 'all', vaultCat: 'all', vaultSearch: ''
+};
+
+/** Fill in any missing keys so older/imported data never crashes the UI. */
+function normalise(raw) {
+  const d = defaultState();
+  const s = Object.assign(d, raw || {});
+  s.tasks = Array.isArray(s.tasks) ? s.tasks : [];
+  s.checklists = (Array.isArray(s.checklists) ? s.checklists : []).map(c => ({ items: [], ...c, items: Array.isArray(c.items) ? c.items : [] }));
+  s.people = (Array.isArray(s.people) ? s.people : []).map(p => ({ ideas: [], history: [], finalGift: null, cardBought: false, cardSent: false, yearKnown: true, ...p,
+    ideas: Array.isArray(p.ideas) ? p.ideas : [], history: Array.isArray(p.history) ? p.history : [] }));
+  s.christmas = Object.assign({ year: new Date().getFullYear(), budget: 0, recipients: [], archive: [] }, s.christmas || {});
+  s.christmas.recipients = (s.christmas.recipients || []).map(r => ({ gifts: [], ...r, gifts: Array.isArray(r.gifts) ? r.gifts : [] }));
+  s.vault = Array.isArray(s.vault) ? s.vault : [];
+  s.settings = Object.assign(defaultState().settings, s.settings || {});
+  s.settings.sync = Object.assign(defaultState().settings.sync, s.settings.sync || {});
+  s.meta = Object.assign({ updatedAt: Date.now(), updatedBy: CLIENT_ID }, s.meta || {});
+  return s;
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return normalise(JSON.parse(raw));
+  } catch (e) { console.warn('Could not read saved data', e); }
+  const s = sampleState();
+  localStorage.setItem(STORE_KEY, JSON.stringify(s));
+  return s;
+}
+
+/** Write to localStorage only (no timestamp bump, no cloud push). */
+function persist() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+/** Record a user change: bump timestamp, persist and (if enabled) push to the cloud. */
+function save() {
+  state.meta.updatedAt = Date.now();
+  state.meta.updatedBy = CLIENT_ID;
+  try { persist(); } catch (e) { toast('Could not save – storage may be full', 'error'); }
+  Sync.schedulePush();
+}
+function commit() { save(); render(); }
+
+/** The shareable part of state (device-specific sync settings are excluded). */
+function exportable() {
+  const { settings, ...rest } = state;
+  return clone(rest);
+}
+
+/* ======================== 4. DOMAIN HELPERS ========================== */
+function bdayInYear(dob, year) {
+  const [, m, d] = dob.split('-').map(Number);
+  const day = (m === 2 && d === 29 && !isLeap(year)) ? 28 : d;
+  return ymd(new Date(year, m - 1, day));
+}
+/** Next occurrence (today counts) – returns { date, days, turning } */
+function nextBirthday(p) {
+  if (!p.dob) return { date: null, days: 9999, turning: null };
+  const t = todayStr();
+  const y = new Date().getFullYear();
+  let date = bdayInYear(p.dob, y);
+  if (date < t) date = bdayInYear(p.dob, y + 1);
+  const turning = p.yearKnown !== false ? Number(date.slice(0, 4)) - Number(p.dob.slice(0, 4)) : null;
+  return { date, days: daysUntil(date), turning };
+}
+
+/** Once a birthday has passed, archive the chosen gift and reset card/gift trackers for next year. */
+function ensureCycles() {
+  let changed = false;
+  const t = todayStr();
+  state.people.forEach(p => {
+    if (!p.dob) return;
+    const nb = nextBirthday(p).date;
+    if (!p.cycleFor) { p.cycleFor = nb; changed = true; return; }
+    if (p.cycleFor < t) {
+      if (p.finalGift && p.finalGift.title) {
+        p.history.unshift({ id: uid(), year: Number(p.cycleFor.slice(0, 4)), occasion: 'Birthday', gift: p.finalGift.title, price: num(p.finalGift.price), notes: 'Auto-archived after birthday' });
+      }
+      p.finalGift = null; p.cardBought = false; p.cardSent = false; p.cycleFor = nb;
+      touch(p); changed = true;
+    }
+  });
+  if (changed) save();
+}
+
+const recipientDone = r => r.gifts.length > 0 && r.gifts.every(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX);
+const recipientSpent = r => sum(r.gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX), g => num(g.price));
+function xmasStats() {
+  const c = state.christmas, R = c.recipients;
+  const gifts = R.flatMap(r => r.gifts);
+  const spent = sum(gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX), g => num(g.price));
+  return {
+    budget: num(c.budget), spent,
+    planned: sum(gifts, g => num(g.price)),
+    budgeted: sum(R, r => num(r.budget)),
+    remaining: num(c.budget) - spent,
+    done: R.filter(recipientDone).length, total: R.length,
+    giftsTotal: gifts.length, giftsBought: gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX).length,
+    days: daysUntil(`${c.year}-12-25`)
+  };
+}
+
+function sortTasks(a, b) {
+  if (a.done !== b.done) return a.done ? 1 : -1;
+  const ad = a.due || '9999-99-99', bd = b.due || '9999-99-99';
+  if (ad !== bd) return ad < bd ? -1 : 1;
+  return (PRIORITIES[a.priority]?.rank ?? 1) - (PRIORITIES[b.priority]?.rank ?? 1);
+}
+
+/* ========================= 5. UI PRIMITIVES ========================== */
+const icon = (n, c = 'w-4 h-4') => `<i data-lucide="${n}" class="${c}"></i>`;
+const pill = (text, cls) => `<span class="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${cls}">${text}</span>`;
+const CARD = 'bg-white rounded-2xl border border-slate-200/70 shadow-sm';
+const BTN = 'inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition active:scale-[.98]';
+const BTN_PRIMARY = `${BTN} bg-teal-600 hover:bg-teal-700 text-white shadow-sm`;
+const BTN_SOFT = `${BTN} bg-teal-50 hover:bg-teal-100 text-teal-700`;
+const BTN_GHOST = `${BTN} bg-white hover:bg-slate-50 text-slate-700 ring-1 ring-slate-200`;
+const BTN_DANGER = `${BTN} bg-rose-50 hover:bg-rose-100 text-rose-700`;
+const ICON_BTN = 'w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition';
+const INPUT = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base sm:text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500';
+
+function progress(pct, colour = 'bg-teal-500', h = 'h-2') {
+  pct = Math.max(0, Math.min(100, isFinite(pct) ? pct : 0));
+  return `<div class="${h} rounded-full bg-slate-100 overflow-hidden"><div class="h-full ${colour} rounded-full transition-all duration-500" style="width:${pct}%"></div></div>`;
+}
+function emptyBox(iconName, title, sub, actionHtml = '') {
+  return `<div class="text-center py-10 px-4">
+    <div class="mx-auto w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">${icon(iconName, 'w-6 h-6')}</div>
+    <p class="font-medium text-slate-700">${title}</p>
+    ${sub ? `<p class="text-sm text-slate-500 mt-1">${sub}</p>` : ''}
+    ${actionHtml ? `<div class="mt-4">${actionHtml}</div>` : ''}
+  </div>`;
+}
+function filterPills(items, current, action) {
+  return `<div class="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">${items.map(([val, label, count]) => `
+    <button type="button" data-action="${action}" data-val="${val}"
+      class="shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition ${current === val ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'}">
+      ${label}${count !== undefined ? ` <span class="${current === val ? 'text-slate-300' : 'text-slate-400'}">${count}</span>` : ''}
+    </button>`).join('')}</div>`;
+}
+function renewalBadge(s) {
+  const d = daysUntil(s);
+  if (d === null) return pill('No date', 'bg-slate-50 text-slate-500 ring-slate-200');
+  if (d < 0) return pill(`${icon('triangle-alert', 'w-3 h-3')} Ended ${-d}d ago`, 'bg-rose-50 text-rose-700 ring-rose-200');
+  const label = d === 0 ? 'Today' : d > 90 ? `${Math.round(d / 30.4)} months` : `${d} day${d === 1 ? '' : 's'}`;
+  if (d < 14) return pill(`${icon('clock', 'w-3 h-3')} ${label}`, 'bg-rose-50 text-rose-700 ring-rose-200');
+  if (d < 60) return pill(`${icon('clock', 'w-3 h-3')} ${label}`, 'bg-amber-50 text-amber-700 ring-amber-200');
+  return pill(label, 'bg-emerald-50 text-emerald-700 ring-emerald-200');
+}
+
+// ---- Form field helpers ----
+const field = (label, input, hint = '') => `<label class="block"><span class="block text-sm font-medium text-slate-700 mb-1.5">${label}</span>${input}${hint ? `<span class="block text-xs text-slate-500 mt-1">${hint}</span>` : ''}</label>`;
+const inp = (name, val = '', attrs = '') => `<input name="${name}" value="${esc(val)}" class="${INPUT}" ${attrs}>`;
+const ta = (name, val = '', attrs = '') => `<textarea name="${name}" rows="3" class="${INPUT}" ${attrs}>${esc(val)}</textarea>`;
+const sel = (name, opts, val) => `<select name="${name}" class="${INPUT}">${opts.map(([k, v]) => `<option value="${esc(k)}" ${String(k) === String(val) ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
+const chk = (name, label, checked, hint = '') => `<label class="flex items-start gap-3 rounded-xl bg-slate-50 px-3 py-3 cursor-pointer">
+  <input type="checkbox" name="${name}" ${checked ? 'checked' : ''} class="mt-0.5 w-5 h-5 rounded accent-teal-600"><span><span class="block text-sm font-medium text-slate-700">${label}</span>${hint ? `<span class="block text-xs text-slate-500">${hint}</span>` : ''}</span></label>`;
+const moneyInp = (name, val) => `<div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">£</span><input name="${name}" value="${val || val === 0 ? esc(val) : ''}" inputmode="decimal" placeholder="0.00" class="${INPUT} pl-7"></div>`;
+
+function refreshIcons() { if (window.lucide) { try { lucide.createIcons(); } catch (e) { /* offline */ } } }
+
+// ---- Toast ----
+function toast(msg, type = 'ok') {
+  const el = document.createElement('div');
+  el.className = `anim-up pointer-events-auto rounded-xl px-4 py-2.5 text-sm font-medium shadow-lg ${type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`;
+  el.textContent = msg;
+  $('#toast-root').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2600);
+}
+
+// ---- Modal (one at a time; bottom-sheet on mobile, centred dialog on desktop) ----
+let modalHandler = null, modalSeq = 0;
+function openModal({ title, body, submitLabel = 'Save', onSubmit = null, footer = '', danger = false, wide = false }) {
+  modalSeq++;
+  modalHandler = onSubmit;
+  $('#modal-root').innerHTML = `
+  <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] anim-fade" data-action="close-modal"></div>
+    <form id="modal-form" class="relative anim-up bg-white w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'} rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col" autocomplete="off">
+      <div class="flex items-center gap-3 px-5 pt-5 pb-3 border-b border-slate-100">
+        <h2 class="flex-1 text-lg font-semibold text-slate-900">${title}</h2>
+        <button type="button" data-action="close-modal" class="${ICON_BTN}" aria-label="Close">${icon('x', 'w-5 h-5')}</button>
+      </div>
+      <div class="overflow-y-auto px-5 py-4 space-y-4">${body}</div>
+      ${onSubmit ? `<div class="flex gap-2 justify-end px-5 py-4 border-t border-slate-100 safe-bottom">
+        <button type="button" data-action="close-modal" class="${BTN_GHOST}">Cancel</button>
+        <button type="submit" class="${danger ? `${BTN} bg-rose-600 hover:bg-rose-700 text-white` : BTN_PRIMARY}">${submitLabel}</button>
+      </div>` : (footer ? `<div class="px-5 py-4 border-t border-slate-100 safe-bottom">${footer}</div>` : '<div class="h-3 safe-bottom"></div>')}
+    </form>
+  </div>`;
+  document.body.style.overflow = 'hidden';
+  refreshIcons();
+  if (window.matchMedia('(min-width: 640px)').matches) {
+    const first = $('#modal-form input:not([type=hidden]):not([type=checkbox]):not([type=radio]), #modal-form textarea');
+    if (first) first.focus();
+  }
+}
+function closeModal() { $('#modal-root').innerHTML = ''; modalHandler = null; document.body.style.overflow = ''; }
+function confirmModal(message, onYes, { title = 'Are you sure?', yesLabel = 'Delete', danger = true } = {}) {
+  openModal({ title, body: `<p class="text-slate-600">${message}</p>`, submitLabel: yesLabel, danger, onSubmit: () => { onYes(); } });
+}
+
+/* ============================== 6. VIEWS ============================== */
+
+/* ---------- 6.1 DASHBOARD ---------- */
+function taskRow(t) {
+  let due = '';
+  if (t.due) {
+    const d = daysUntil(t.due);
+    const cls = t.done ? 'text-slate-400' : d < 0 ? 'text-rose-600 font-medium' : d === 0 ? 'text-teal-700 font-medium' : 'text-slate-500';
+    const lbl = d < 0 ? `Overdue · ${fmtDate(t.due, { day: 'numeric', month: 'short' })}` : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : fmtDate(t.due, { weekday: 'short', day: 'numeric', month: 'short' });
+    due = `<span class="inline-flex items-center gap-1 text-xs ${cls}">${icon('calendar', 'w-3.5 h-3.5')}${lbl}</span>`;
+  }
+  const p = PRIORITIES[t.priority] || PRIORITIES.medium;
+  return `<li class="flex items-start gap-3 py-3">
+    <button type="button" data-action="task-toggle" data-id="${t.id}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}"
+      class="mt-0.5 shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${t.done ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300 hover:border-teal-500 text-transparent hover:text-teal-400'}">${icon('check', 'w-3.5 h-3.5')}</button>
+    <div class="flex-1 min-w-0">
+      <p class="text-sm ${t.done ? 'line-through text-slate-400' : 'text-slate-800 font-medium'} break-words">${esc(t.title)}</p>
+      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">${pill(p.label, p.cls)}<span class="text-xs text-slate-500">${TASK_CATS[t.category] || 'General'}</span>${due}</div>
+      ${t.notes ? `<p class="text-xs text-slate-500 mt-1 break-words">${esc(t.notes)}</p>` : ''}
+    </div>
+    <div class="flex shrink-0 -mr-2">
+      <button type="button" data-action="task-edit" data-id="${t.id}" class="${ICON_BTN}" aria-label="Edit">${icon('pencil')}</button>
+      <button type="button" data-action="task-delete" data-id="${t.id}" class="${ICON_BTN} hover:!text-rose-600" aria-label="Delete">${icon('trash-2')}</button>
+    </div>
+  </li>`;
+}
+
+function giftStatusPill(p) {
+  if (!p.finalGift) return pill(`${icon('gift', 'w-3 h-3')} No gift yet`, 'bg-rose-50 text-rose-700 ring-rose-200');
+  if (p.finalGift.status === 'ready') return pill(`${icon('gift', 'w-3 h-3')} Gift ready`, 'bg-emerald-50 text-emerald-700 ring-emerald-200');
+  if (p.finalGift.status === 'ordered') return pill(`${icon('package', 'w-3 h-3')} Gift ordered`, 'bg-sky-50 text-sky-700 ring-sky-200');
+  return pill(`${icon('lightbulb', 'w-3 h-3')} Gift: idea only`, 'bg-amber-50 text-amber-700 ring-amber-200');
+}
+function cardStatusPill(p) {
+  if (!p.cardBought) return pill(`${icon('mail', 'w-3 h-3')} Card needed`, 'bg-rose-50 text-rose-700 ring-rose-200');
+  if (!p.cardSent) return pill(`${icon('mail', 'w-3 h-3')} Card to write/send`, 'bg-amber-50 text-amber-700 ring-amber-200');
+  return pill(`${icon('mail', 'w-3 h-3')} Card sent`, 'bg-emerald-50 text-emerald-700 ring-emerald-200');
+}
+function daysPill(d) {
+  if (d === 0) return pill('🎉 Today', 'bg-teal-600 text-white ring-teal-600');
+  if (d <= 7) return pill(relDays(d), 'bg-rose-50 text-rose-700 ring-rose-200');
+  if (d <= 30) return pill(relDays(d), 'bg-amber-50 text-amber-700 ring-amber-200');
+  return pill(relDays(d), 'bg-slate-50 text-slate-600 ring-slate-200');
+}
+
+function statTile(route, iconName, value, label, tone) {
+  return `<a href="#/${route}" class="${CARD} p-4 flex items-center gap-3 hover:border-teal-300 transition">
+    <div class="w-10 h-10 rounded-xl ${tone} flex items-center justify-center shrink-0">${icon(iconName, 'w-5 h-5')}</div>
+    <div class="min-w-0"><p class="text-2xl font-bold text-slate-900 leading-none">${value}</p><p class="text-xs text-slate-500 mt-1 truncate">${label}</p></div>
+  </a>`;
+}
+
+function renderDashboard() {
+  const t = todayStr();
+  const open = state.tasks.filter(x => !x.done);
+  const overdue = open.filter(x => x.due && x.due < t);
+  const dueToday = open.filter(x => x.due === t);
+  const focus = [...overdue, ...dueToday].sort(sortTasks);
+
+  const bdays = state.people.filter(p => p.dob).map(p => ({ p, nb: nextBirthday(p) })).filter(o => o.nb.days <= 30).sort((a, b) => a.nb.days - b.nb.days);
+  const bdayMissing = bdays.filter(o => !o.p.finalGift || o.p.finalGift.status === 'idea' || !o.p.cardBought || !o.p.cardSent).length;
+  const renewals = state.vault.filter(v => v.renewalDate).map(v => ({ v, d: daysUntil(v.renewalDate) })).filter(o => o.d <= 60 && o.d >= -30).sort((a, b) => a.d - b.d);
+  const xs = xmasStats();
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const activeLists = state.checklists.filter(c => c.items.length && c.items.some(i => i.done) && c.items.some(i => !i.done));
+
+  const quick = [['quick-task', 'list-todo', 'Task'], ['person-new', 'cake', 'Birthday'], ['xmas-gift-new', 'gift', 'Christmas gift'], ['vault-new', 'shield-check', 'Policy / account'], ['cl-new', 'list-checks', 'Checklist']];
+
+  return `
+  <div class="mb-6">
+    <p class="text-sm text-slate-500">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+    <h2 class="text-2xl md:text-3xl font-bold text-slate-900 mt-1">${greet} 👋</h2>
+  </div>
+
+  <div class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-6">
+    ${quick.map(([a, i, l]) => `<button type="button" data-action="${a}" class="shrink-0 ${BTN_GHOST} !rounded-full">${icon('plus', 'w-3.5 h-3.5 text-teal-600')}${icon(i, 'w-4 h-4 text-slate-500')}${l}</button>`).join('')}
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+    ${statTile('tasks', 'calendar-check', dueToday.length, 'Tasks due today', 'bg-teal-50 text-teal-600')}
+    ${statTile('tasks', 'triangle-alert', overdue.length, 'Overdue tasks', overdue.length ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500')}
+    ${statTile('birthdays', 'cake', bdays.length, 'Birthdays · next 30 days', 'bg-violet-50 text-violet-600')}
+    ${statTile('vault', 'shield-check', renewals.length, 'Renewals · next 60 days', renewals.some(r => r.d < 14) ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600')}
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-4">
+    <!-- Tasks -->
+    <section class="${CARD} p-5">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('list-todo', 'w-5 h-5 text-teal-600')} Today &amp; overdue</h3>
+        <a href="#/tasks" class="text-sm text-teal-700 hover:underline">All tasks</a>
+      </div>
+      ${focus.length ? `<ul class="divide-y divide-slate-100">${focus.slice(0, 6).map(taskRow).join('')}</ul>${focus.length > 6 ? `<p class="text-xs text-slate-500 mt-2">+ ${focus.length - 6} more</p>` : ''}`
+        : emptyBox('circle-check', 'All clear!', 'Nothing due today or overdue.')}
+    </section>
+
+    <!-- Birthdays -->
+    <section class="${CARD} p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('cake', 'w-5 h-5 text-violet-600')} Upcoming birthdays</h3>
+        <a href="#/birthdays" class="text-sm text-teal-700 hover:underline">View all</a>
+      </div>
+      ${bdayMissing ? `<div class="mb-3 rounded-xl bg-amber-50 text-amber-800 text-sm px-3 py-2 flex gap-2 items-center">${icon('triangle-alert', 'w-4 h-4 shrink-0')} ${bdayMissing} upcoming birthday${bdayMissing > 1 ? 's' : ''} still need a card or gift sorting</div>` : ''}
+      ${bdays.length ? `<ul class="space-y-3">${bdays.map(({ p, nb }) => `
+        <li><a href="#/birthdays" data-action="person-open" data-id="${p.id}" class="flex items-start gap-3 rounded-xl hover:bg-slate-50 -mx-2 px-2 py-1.5">
+          <div class="w-10 h-10 rounded-full ${avatarCls(p.name)} flex items-center justify-center text-sm font-semibold shrink-0">${initials(p.name)}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2"><p class="font-medium text-slate-800 truncate">${esc(p.name)}</p>${daysPill(nb.days)}</div>
+            <p class="text-xs text-slate-500">${fmtDate(nb.date, { weekday: 'short', day: 'numeric', month: 'short' })}${nb.turning !== null ? ` · turning ${nb.turning}` : ''}</p>
+            <div class="flex flex-wrap gap-1.5 mt-1.5">${giftStatusPill(p)}${cardStatusPill(p)}</div>
+          </div></a></li>`).join('')}</ul>`
+        : emptyBox('cake', 'No birthdays in the next 30 days', '')}
+    </section>
+
+    <!-- Renewals -->
+    <section class="${CARD} p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('shield-check', 'w-5 h-5 text-amber-600')} Renewals due (60 days)</h3>
+        <a href="#/vault" class="text-sm text-teal-700 hover:underline">Open vault</a>
+      </div>
+      ${renewals.length ? `<ul class="space-y-2">${renewals.map(({ v }) => { const c = VAULT_CAT[v.category] || VAULT_CAT.other; return `
+        <li class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+          <div class="w-9 h-9 rounded-lg ${c.bg} ${c.fg} flex items-center justify-center shrink-0">${icon(c.icon)}</div>
+          <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 truncate">${esc(v.provider)} <span class="font-normal text-slate-500">· ${esc(v.name || c.label)}</span></p>
+          <p class="text-xs text-slate-500">${fmtDate(v.renewalDate)} · ${v.autoRenew ? 'Auto-renews' : '<span class="text-rose-600 font-medium">Does NOT auto-renew</span>'}</p></div>
+          ${renewalBadge(v.renewalDate)}
+        </li>`; }).join('')}</ul>`
+        : emptyBox('shield-check', 'No renewals in the next 60 days', '')}
+    </section>
+
+    <!-- Christmas -->
+    <section class="${CARD} p-5 relative overflow-hidden">
+      <div class="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-emerald-50"></div>
+      <div class="relative">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('tree-pine', 'w-5 h-5 text-emerald-600')} Christmas ${state.christmas.year}</h3>
+          <a href="#/christmas" class="text-sm text-teal-700 hover:underline">Planner</a>
+        </div>
+        <p class="text-sm text-slate-500 mb-4">${xs.days > 0 ? `<span class="font-semibold text-slate-800">${xs.days}</span> days to go` : xs.days === 0 ? '🎄 Merry Christmas!' : 'Christmas has passed – start next year in the planner'}</p>
+        <div class="space-y-4">
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-slate-600">Spent vs budget</span><span class="font-medium ${xs.spent > xs.budget && xs.budget ? 'text-rose-600' : 'text-slate-800'}">${money(xs.spent)} / ${money(xs.budget)}</span></div>
+            ${progress(xs.budget ? xs.spent / xs.budget * 100 : 0, xs.spent > xs.budget && xs.budget ? 'bg-rose-500' : 'bg-emerald-500', 'h-2.5')}
+          </div>
+          <div>
+            <div class="flex justify-between text-sm mb-1.5"><span class="text-slate-600">People sorted</span><span class="font-medium text-slate-800">${xs.done} / ${xs.total}</span></div>
+            ${progress(xs.total ? xs.done / xs.total * 100 : 0, 'bg-teal-500', 'h-2.5')}
+          </div>
+          <p class="text-xs text-slate-500">${xs.giftsBought} of ${xs.giftsTotal} gifts bought · ${money(xs.remaining)} remaining</p>
+        </div>
+      </div>
+    </section>
+
+    ${activeLists.length ? `<section class="${CARD} p-5 lg:col-span-2">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-3">${icon('list-checks', 'w-5 h-5 text-sky-600')} Checklists in progress</h3>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${activeLists.map(c => { const d = c.items.filter(i => i.done).length; return `
+        <a href="#/tasks" data-action="tasks-tab" data-val="checklists" class="rounded-xl bg-slate-50 hover:bg-slate-100 p-3 block">
+          <div class="flex justify-between text-sm mb-2"><span class="font-medium text-slate-800 truncate">${esc(c.title)}</span><span class="text-slate-500">${d}/${c.items.length}</span></div>
+          ${progress(d / c.items.length * 100, 'bg-sky-500')}</a>`; }).join('')}</div>
+    </section>` : ''}
+  </div>`;
+}
+
+/* ---------- 6.2 TASKS & CHECKLISTS ---------- */
+function renderTasks() {
+  const tabs = `<div class="inline-flex rounded-xl bg-slate-100 p-1 mb-5">
+    ${[['tasks', 'Tasks', 'list-todo'], ['checklists', 'Checklists', 'list-checks']].map(([v, l, i]) => `
+      <button type="button" data-action="tasks-tab" data-val="${v}" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${ui.tasksTab === v ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}">${icon(i)}${l}</button>`).join('')}
+  </div>`;
+  return tabs + (ui.tasksTab === 'checklists' ? renderChecklists() : renderTaskList());
+}
+
+function renderTaskList() {
+  const t = todayStr();
+  const T = state.tasks;
+  const filters = {
+    open: x => !x.done,
+    today: x => !x.done && x.due === t,
+    overdue: x => !x.done && x.due && x.due < t,
+    upcoming: x => !x.done && x.due && x.due > t,
+    done: x => x.done,
+    all: () => true
+  };
+  const catOk = x => ui.taskCat === 'all' || x.category === ui.taskCat;
+  const list = T.filter(filters[ui.taskFilter] || filters.open).filter(catOk).sort(sortTasks);
+  const count = k => T.filter(filters[k]).filter(catOk).length;
+  const doneCount = T.filter(x => x.done).length;
+
+  return `
+  <form data-form="task-quick" class="${CARD} p-3 md:p-4 mb-5">
+    <div class="flex gap-2">
+      <input name="title" required placeholder="Add a task… e.g. Book dentist" class="${INPUT} flex-1">
+      <button type="submit" class="${BTN_PRIMARY} shrink-0">${icon('plus')}<span class="hidden sm:inline">Add</span></button>
+    </div>
+    <div class="grid grid-cols-3 gap-2 mt-2">
+      <input type="date" name="due" class="${INPUT} !py-2" aria-label="Due date">
+      ${sel('priority', Object.entries(PRIORITIES).map(([k, v]) => [k, v.label + ' priority']), 'medium').replace(INPUT, INPUT + ' !py-2')}
+      ${sel('category', Object.entries(TASK_CATS), 'general').replace(INPUT, INPUT + ' !py-2')}
+    </div>
+  </form>
+
+  <div class="space-y-2 mb-4">
+    ${filterPills([['open', 'Open', count('open')], ['today', 'Today', count('today')], ['overdue', 'Overdue', count('overdue')], ['upcoming', 'Upcoming', count('upcoming')], ['done', 'Completed', count('done')], ['all', 'All', count('all')]], ui.taskFilter, 'task-filter')}
+    ${filterPills([['all', 'All categories'], ...Object.entries(TASK_CATS)], ui.taskCat, 'task-cat')}
+  </div>
+
+  <section class="${CARD} px-4 md:px-5">
+    ${list.length ? `<ul class="divide-y divide-slate-100">${list.map(taskRow).join('')}</ul>` : emptyBox('circle-check', 'No tasks here', ui.taskFilter === 'done' ? 'Completed tasks will appear here.' : 'Use the box above to add one.')}
+  </section>
+  ${doneCount ? `<div class="mt-3 text-right"><button type="button" data-action="tasks-clear-done" class="text-sm text-slate-500 hover:text-rose-600">Clear ${doneCount} completed</button></div>` : ''}`;
+}
+
+function renderChecklists() {
+  const C = state.checklists;
+  return `
+  <div class="flex items-center justify-between mb-4">
+    <p class="text-sm text-slate-500">Reusable templates can be reset or copied each time you need them.</p>
+    <button type="button" data-action="cl-new" class="${BTN_PRIMARY} shrink-0">${icon('plus')}New</button>
+  </div>
+  ${C.length ? `<div class="grid md:grid-cols-2 gap-4 items-start">${C.map(checklistCard).join('')}</div>`
+    : `<div class="${CARD}">${emptyBox('list-checks', 'No checklists yet', 'Create one for packing, food shops, projects…', `<button type="button" data-action="cl-new" class="${BTN_SOFT}">${icon('plus')}Create checklist</button>`)}</div>`}`;
+}
+
+function checklistCard(c) {
+  const done = c.items.filter(i => i.done).length, total = c.items.length;
+  const pct = total ? done / total * 100 : 0;
+  const collapsed = !!ui.clCollapsed[c.id];
+  return `<section class="${CARD} overflow-hidden">
+    <button type="button" data-action="cl-collapse" data-id="${c.id}" class="w-full text-left p-4 md:p-5">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap"><h3 class="font-semibold text-slate-900">${esc(c.title)}</h3>
+            ${c.reusable ? pill(`${icon('repeat', 'w-3 h-3')} Reusable`, 'bg-sky-50 text-sky-700 ring-sky-200') : ''}
+            ${total && done === total ? pill(`${icon('check', 'w-3 h-3')} Complete`, 'bg-emerald-50 text-emerald-700 ring-emerald-200') : ''}</div>
+          <p class="text-xs text-slate-500 mt-1">${done} of ${total} done</p>
+        </div>
+        <span class="text-slate-400 transition ${collapsed ? '' : 'rotate-180'}">${icon('chevron-down', 'w-5 h-5')}</span>
+      </div>
+      <div class="mt-3">${progress(pct, done === total && total ? 'bg-emerald-500' : 'bg-sky-500')}</div>
+    </button>
+    ${collapsed ? '' : `
+    <div class="px-4 md:px-5 pb-4">
+      <ul class="space-y-1">${c.items.map(i => `
+        <li class="flex items-center gap-2 group">
+          <button type="button" data-action="cl-toggle-item" data-id="${c.id}" data-item="${i.id}" class="flex-1 flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 text-left">
+            <span class="w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center ${i.done ? 'bg-sky-500 border-sky-500 text-white' : 'border-slate-300 text-transparent'}">${icon('check', 'w-3 h-3')}</span>
+            <span class="text-sm ${i.done ? 'line-through text-slate-400' : 'text-slate-700'} break-words">${esc(i.text)}</span>
+          </button>
+          <button type="button" data-action="cl-del-item" data-id="${c.id}" data-item="${i.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Remove item">${icon('x', 'w-3.5 h-3.5')}</button>
+        </li>`).join('')}</ul>
+      <form data-form="cl-add-item" data-id="${c.id}" class="flex gap-2 mt-2">
+        <input name="text" required placeholder="Add item…" class="${INPUT} !py-2" data-focus-key="cl-${c.id}">
+        <button type="submit" class="${BTN_SOFT} shrink-0" aria-label="Add item">${icon('plus')}</button>
+      </form>
+      <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100">
+        ${c.reusable ? `<button type="button" data-action="cl-reset" data-id="${c.id}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('rotate-ccw', 'w-3.5 h-3.5')}Reset ticks</button>` : ''}
+        <button type="button" data-action="cl-dup" data-id="${c.id}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('copy-plus', 'w-3.5 h-3.5')}${c.reusable ? 'Use as new list' : 'Duplicate'}</button>
+        <button type="button" data-action="cl-edit" data-id="${c.id}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('pencil', 'w-3.5 h-3.5')}Edit</button>
+        <button type="button" data-action="cl-delete" data-id="${c.id}" class="${BTN_DANGER} !py-1.5 !text-xs ml-auto">${icon('trash-2', 'w-3.5 h-3.5')}Delete</button>
+      </div>
+    </div>`}
+  </section>`;
+}
+
+/* ---------- 6.3 BIRTHDAYS ---------- */
+function renderBirthdays() {
+  const list = state.people.map(p => ({ p, nb: nextBirthday(p) })).sort((a, b) => a.nb.days - b.nb.days);
+  let lastMonth = '';
+  const rows = list.map(({ p, nb }) => {
+    const m = nb.date ? parseYMD(nb.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'No date';
+    const header = m !== lastMonth ? `<h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 pt-4 pb-1 px-1">${m}</h3>` : '';
+    lastMonth = m;
+    return header + personCard(p, nb);
+  }).join('');
+
+  return `
+  <div class="flex items-center justify-between gap-3 mb-2">
+    <p class="text-sm text-slate-500">${state.people.length} ${state.people.length === 1 ? 'person' : 'people'} · sorted by next birthday</p>
+    <button type="button" data-action="person-new" class="${BTN_PRIMARY}">${icon('user-plus')}Add person</button>
+  </div>
+  ${list.length ? `<div class="space-y-3">${rows}</div>` : `<div class="${CARD}">${emptyBox('cake', 'No birthdays yet', 'Add family and friends to start tracking.', `<button type="button" data-action="person-new" class="${BTN_SOFT}">${icon('user-plus')}Add person</button>`)}</div>`}`;
+}
+
+function personCard(p, nb) {
+  const open = !!ui.personOpen[p.id];
+  const fg = p.finalGift;
+  const givenBefore = title => {
+    const tl = String(title || '').toLowerCase().trim();
+    if (!tl) return null;
+    const h = p.history.find(x => { const g = String(x.gift || '').toLowerCase(); return g && (g.includes(tl) || tl.includes(g)); });
+    return h ? h.year : null;
+  };
+
+  return `<article class="${CARD} overflow-hidden" id="person-${p.id}">
+    <button type="button" data-action="person-toggle" data-id="${p.id}" class="w-full text-left p-4 flex items-start gap-3">
+      <div class="w-12 h-12 rounded-full ${avatarCls(p.name)} flex items-center justify-center font-semibold shrink-0">${initials(p.name)}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0"><p class="font-semibold text-slate-900 truncate">${esc(p.name)}</p>
+          <p class="text-xs text-slate-500">${p.relationship ? esc(p.relationship) + ' · ' : ''}${nb.date ? fmtDate(nb.date, { weekday: 'short', day: 'numeric', month: 'long' }) : 'No date set'}${nb.turning !== null && nb.date ? ` · <span class="font-medium text-slate-700">turning ${nb.turning}</span>` : ''}</p></div>
+          ${nb.date ? daysPill(nb.days) : ''}
+        </div>
+        <div class="flex flex-wrap gap-1.5 mt-2">${giftStatusPill(p)}${cardStatusPill(p)}${p.ideas.length ? pill(`${icon('lightbulb', 'w-3 h-3')} ${p.ideas.length} idea${p.ideas.length > 1 ? 's' : ''}`, 'bg-slate-50 text-slate-600 ring-slate-200') : ''}</div>
+      </div>
+      <span class="text-slate-400 mt-1 transition ${open ? 'rotate-180' : ''}">${icon('chevron-down', 'w-5 h-5')}</span>
+    </button>
+
+    ${!open ? '' : `
+    <div class="border-t border-slate-100 bg-slate-50/50 p-4 space-y-5">
+      ${p.notes ? `<p class="text-sm text-slate-600 bg-white rounded-xl px-3 py-2 ring-1 ring-slate-200">${icon('info', 'w-4 h-4 inline -mt-0.5 text-slate-400')} ${esc(p.notes)}</p>` : ''}
+
+      <!-- Final gift -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Final gift</h4>
+        ${fg ? `<div class="bg-white rounded-xl ring-1 ring-slate-200 p-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0"><p class="font-medium text-slate-800 break-words">${icon('gift', 'w-4 h-4 inline -mt-0.5 text-teal-600')} ${esc(fg.title)}</p>
+              <p class="text-xs text-slate-500">${fg.price ? money(fg.price) : 'No price set'}</p></div>
+              <div class="flex shrink-0"><button type="button" data-action="final-custom" data-id="${p.id}" class="${ICON_BTN}" aria-label="Edit final gift">${icon('pencil')}</button>
+              <button type="button" data-action="final-clear" data-id="${p.id}" class="${ICON_BTN}" aria-label="Clear final gift">${icon('x')}</button></div>
+            </div>
+            <div class="grid grid-cols-3 gap-1 mt-3 rounded-xl bg-slate-100 p-1">
+              ${GIFT_STATUS.map((s, i) => { const cur = GIFT_STATUS.findIndex(x => x.id === fg.status); const on = s.id === fg.status; return `
+                <button type="button" data-action="final-status" data-id="${p.id}" data-val="${s.id}" class="flex flex-col sm:flex-row items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium transition ${on ? 'bg-white shadow-sm text-teal-700' : i < cur ? 'text-teal-600' : 'text-slate-500 hover:text-slate-700'}">${icon(i < cur ? 'circle-check' : s.icon, 'w-4 h-4')}<span>${s.label}</span></button>`; }).join('')}
+            </div>
+          </div>`
+        : `<div class="bg-white rounded-xl ring-1 ring-dashed ring-slate-300 p-3 text-sm text-slate-500 flex flex-wrap items-center justify-between gap-2">
+            <span>No final gift chosen – select one of the ideas below, or</span>
+            <button type="button" data-action="final-custom" data-id="${p.id}" class="${BTN_SOFT} !py-1.5">${icon('plus', 'w-3.5 h-3.5')}Enter custom gift</button></div>`}
+      </div>
+
+      <!-- Card tracker -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Card tracker</h4>
+        <div class="grid grid-cols-2 gap-2">
+          ${[['card-bought', p.cardBought, 'Card bought', 'shopping-bag'], ['card-sent', p.cardSent, 'Card written / sent', 'send']].map(([a, on, l, i]) => `
+            <button type="button" data-action="${a}" data-id="${p.id}" aria-pressed="${on}" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-left ring-1 transition ${on ? 'bg-emerald-50 ring-emerald-200 text-emerald-800' : 'bg-white ring-slate-200 text-slate-600 hover:ring-teal-300'}">
+              <span class="w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center ${on ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 text-transparent'}">${icon('check', 'w-3.5 h-3.5')}</span>${l}</button>`).join('')}
+        </div>
+      </div>
+
+      <!-- Gift ideas -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Gift ideas</h4>
+        ${p.ideas.length ? `<ul class="space-y-2 mb-2">${p.ideas.map(idea => { const isSel = fg && fg.ideaId === idea.id; const yr = givenBefore(idea.title); const url = safeUrl(idea.link); return `
+          <li class="bg-white rounded-xl ring-1 ${isSel ? 'ring-teal-300' : 'ring-slate-200'} p-3 flex flex-wrap items-center gap-2">
+            <div class="flex-1 min-w-[10rem]"><p class="text-sm font-medium text-slate-800 break-words">${esc(idea.title)}</p>
+              <p class="text-xs text-slate-500 flex flex-wrap gap-x-3">${idea.price ? `<span>${money(idea.price)}</span>` : ''}${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="text-teal-700 hover:underline inline-flex items-center gap-1">${icon('external-link', 'w-3 h-3')}Link</a>` : ''}
+              ${yr ? `<span class="text-amber-700 font-medium">${icon('triangle-alert', 'w-3 h-3 inline -mt-0.5')} Similar gift given in ${yr}</span>` : ''}</p></div>
+            ${isSel ? pill(`${icon('star', 'w-3 h-3')} Selected`, 'bg-teal-50 text-teal-700 ring-teal-200')
+              : `<button type="button" data-action="idea-select" data-id="${p.id}" data-item="${idea.id}" class="${BTN_SOFT} !py-1.5 !text-xs">${icon('star', 'w-3.5 h-3.5')}Select as final gift</button>`}
+            <button type="button" data-action="idea-delete" data-id="${p.id}" data-item="${idea.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Delete idea">${icon('trash-2', 'w-3.5 h-3.5')}</button>
+          </li>`; }).join('')}</ul>` : ''}
+        <form data-form="idea-add" data-id="${p.id}" class="grid grid-cols-[1fr_6rem] sm:grid-cols-[1fr_6rem_1fr_auto] gap-2">
+          <input name="title" required placeholder="Gift idea" class="${INPUT} !py-2" data-focus-key="idea-${p.id}">
+          <input name="price" inputmode="decimal" placeholder="£ est." class="${INPUT} !py-2">
+          <input name="link" placeholder="Link (optional)" class="${INPUT} !py-2 col-span-2 sm:col-span-1">
+          <button type="submit" class="${BTN_SOFT} col-span-2 sm:col-span-1">${icon('plus')}Add idea</button>
+        </form>
+      </div>
+
+      <!-- History -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Gift history</h4>
+          <button type="button" data-action="history-add" data-id="${p.id}" class="text-xs font-medium text-teal-700 hover:underline">+ Add past gift</button>
+        </div>
+        ${p.history.length ? `<ul class="bg-white rounded-xl ring-1 ring-slate-200 divide-y divide-slate-100">${[...p.history].sort((a, b) => b.year - a.year).map(h => `
+          <li class="flex items-center gap-3 px-3 py-2">
+            <span class="text-xs font-semibold text-slate-500 w-10 shrink-0">${esc(h.year)}</span>
+            <div class="flex-1 min-w-0"><p class="text-sm text-slate-800 break-words">${esc(h.gift)}</p>
+              <p class="text-xs text-slate-500">${esc(h.occasion || 'Birthday')}${h.price ? ' · ' + money(h.price) : ''}${h.notes ? ' · ' + esc(h.notes) : ''}</p></div>
+            <button type="button" data-action="history-delete" data-id="${p.id}" data-item="${h.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Delete history entry">${icon('x', 'w-3.5 h-3.5')}</button>
+          </li>`).join('')}</ul>` : '<p class="text-sm text-slate-500">No past gifts logged. Final gifts are archived here automatically after each birthday.</p>'}
+      </div>
+
+      <div class="flex flex-wrap gap-2 pt-3 border-t border-slate-200">
+        <button type="button" data-action="person-edit" data-id="${p.id}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('pencil', 'w-3.5 h-3.5')}Edit details</button>
+        ${fg ? `<button type="button" data-action="person-archive" data-id="${p.id}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('archive', 'w-3.5 h-3.5')}Archive gift to history now</button>` : ''}
+        <button type="button" data-action="person-delete" data-id="${p.id}" class="${BTN_DANGER} !py-1.5 !text-xs ml-auto">${icon('trash-2', 'w-3.5 h-3.5')}Delete</button>
+      </div>
+    </div>`}
+  </article>`;
+}
+
+/* ---------- 6.4 CHRISTMAS ---------- */
+function renderChristmas() {
+  const c = state.christmas, xs = xmasStats();
+  const R = c.recipients;
+  const filtered = R.filter(r => ui.xmasFilter === 'all' ? true : ui.xmasFilter === 'done' ? recipientDone(r) : !recipientDone(r))
+    .sort((a, b) => (recipientDone(a) - recipientDone(b)) || a.name.localeCompare(b.name));
+  const over = xs.budget && xs.spent > xs.budget;
+
+  const tile = (label, val, sub = '', cls = 'text-slate-900') => `<div class="${CARD} p-4"><p class="text-xs text-slate-500">${label}</p><p class="text-xl md:text-2xl font-bold ${cls} mt-1">${val}</p>${sub ? `<p class="text-xs text-slate-500 mt-0.5">${sub}</p>` : ''}</div>`;
+
+  return `
+  <div class="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white p-5 md:p-6 mb-4 shadow-sm relative overflow-hidden">
+    <div class="absolute right-4 top-4 opacity-20">${icon('snowflake', 'w-20 h-20')}</div>
+    <div class="relative flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="text-emerald-100 text-sm">Christmas ${c.year}</p>
+        <p class="text-3xl font-bold mt-1">${xs.days > 0 ? `${xs.days} days to go` : xs.days === 0 ? 'Merry Christmas! 🎄' : 'All done for this year'}</p>
+        <p class="text-emerald-100 text-sm mt-1">${xs.done} of ${xs.total} people sorted · ${xs.giftsBought} of ${xs.giftsTotal} gifts bought</p>
+      </div>
+      <button type="button" data-action="xmas-budget" class="${BTN} bg-white/15 hover:bg-white/25 text-white ring-1 ring-white/30">${icon('wallet')}Overall budget: ${money(xs.budget)}</button>
+    </div>
+    <div class="relative mt-4 space-y-2">
+      <div class="flex justify-between text-xs text-emerald-50"><span>Spent ${money(xs.spent)}</span><span>${over ? 'Over budget!' : money(xs.remaining) + ' left'}</span></div>
+      <div class="h-2.5 rounded-full bg-white/20 overflow-hidden"><div class="h-full rounded-full ${over ? 'bg-rose-300' : 'bg-white'}" style="width:${Math.min(100, xs.budget ? xs.spent / xs.budget * 100 : 0)}%"></div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+    ${tile('Overall budget', money(xs.budget))}
+    ${tile('Total budgeted (per person)', money(xs.budgeted), xs.budget && xs.budgeted > xs.budget ? '<span class="text-rose-600">Exceeds overall budget</span>' : `${money(xs.budget - xs.budgeted)} unallocated`)}
+    ${tile('Total spent', money(xs.spent), `${money(xs.planned)} incl. ideas`)}
+    ${tile('Remaining budget', money(xs.remaining), '', xs.remaining < 0 ? 'text-rose-600' : 'text-emerald-700')}
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <button type="button" data-action="xmas-recipient-new" class="${BTN_PRIMARY}">${icon('user-plus')}Add recipient</button>
+    <button type="button" data-action="xmas-import" class="${BTN_GHOST}">${icon('users')}Import from birthdays</button>
+    <button type="button" data-action="xmas-new-year" class="${BTN_GHOST} sm:ml-auto">${icon('archive')}Start ${c.year + 1}</button>
+  </div>
+  <div class="mb-4">${filterPills([['all', 'Everyone', R.length], ['todo', 'Still need to buy', R.filter(r => !recipientDone(r)).length], ['done', 'Completed', xs.done]], ui.xmasFilter, 'xmas-filter')}</div>
+
+  ${filtered.length ? `<div class="grid md:grid-cols-2 gap-4 items-start">${filtered.map(recipientCard).join('')}</div>`
+    : `<div class="${CARD}">${emptyBox('gift', R.length ? 'Nobody in this view' : 'No recipients yet', R.length ? '' : 'Import people from your birthday list or add Christmas-only recipients.')}</div>`}`;
+}
+
+function recipientCard(r) {
+  const spent = recipientSpent(r), budget = num(r.budget), planned = sum(r.gifts, g => num(g.price));
+  const done = recipientDone(r);
+  const person = r.personId ? byId(state.people, r.personId) : null;
+  const past = person ? [...person.history].sort((a, b) => b.year - a.year).slice(0, 3) : [];
+  return `<article class="${CARD} p-4 md:p-5">
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-full ${avatarCls(r.name)} flex items-center justify-center text-sm font-semibold shrink-0">${initials(r.name)}</div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap"><h3 class="font-semibold text-slate-900 break-words">${esc(r.name)}</h3>
+          ${person ? `<span title="Linked to birthday list" class="text-violet-500">${icon('link', 'w-3.5 h-3.5')}</span>` : ''}
+          ${done ? pill(`${icon('check', 'w-3 h-3')} Done`, 'bg-emerald-50 text-emerald-700 ring-emerald-200') : ''}</div>
+        <p class="text-xs text-slate-500">${money(spent)} spent of ${money(budget)} target${planned > spent ? ` · ${money(planned)} planned` : ''}</p>
+      </div>
+      <button type="button" data-action="xmas-recipient-edit" data-id="${r.id}" class="${ICON_BTN}" aria-label="Edit recipient">${icon('pencil')}</button>
+      <button type="button" data-action="xmas-recipient-delete" data-id="${r.id}" class="${ICON_BTN} -mr-2" aria-label="Remove recipient">${icon('trash-2')}</button>
+    </div>
+    <div class="mt-3">${progress(budget ? spent / budget * 100 : 0, budget && spent > budget ? 'bg-rose-500' : 'bg-emerald-500')}</div>
+    ${budget && spent > budget ? `<p class="text-xs text-rose-600 mt-1">${money(spent - budget)} over target</p>` : ''}
+    ${r.notes ? `<p class="text-xs text-slate-500 mt-2">${esc(r.notes)}</p>` : ''}
+
+    <ul class="mt-3 space-y-2">${r.gifts.map(g => { const url = safeUrl(g.link); return `
+      <li class="rounded-xl bg-slate-50 p-2.5 flex flex-wrap items-center gap-2">
+        <div class="flex-1 min-w-[8rem]">
+          <p class="text-sm font-medium text-slate-800 break-words">${esc(g.title)}</p>
+          <p class="text-xs text-slate-500">${g.price ? money(g.price) : 'No price'}${url ? ` · <a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="text-teal-700 hover:underline">link</a>` : ''}</p>
+        </div>
+        <select data-change="xmas-gift-status" data-id="${r.id}" data-item="${g.id}" aria-label="Gift status"
+          class="rounded-lg border-0 ring-1 ring-inset text-xs font-medium py-1.5 pl-2 pr-7 ${(XMAS_STATUS[XMAS_IDX[g.status]] || XMAS_STATUS[0]).cls}">
+          ${XMAS_STATUS.map(s => `<option value="${s.id}" ${s.id === g.status ? 'selected' : ''}>${s.label}</option>`).join('')}
+        </select>
+        <button type="button" data-action="xmas-gift-edit" data-id="${r.id}" data-item="${g.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Edit gift">${icon('pencil', 'w-3.5 h-3.5')}</button>
+        <button type="button" data-action="xmas-gift-delete" data-id="${r.id}" data-item="${g.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Delete gift">${icon('x', 'w-3.5 h-3.5')}</button>
+      </li>`; }).join('')}</ul>
+    <button type="button" data-action="xmas-gift-new" data-id="${r.id}" class="mt-2 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-teal-300 hover:bg-teal-50/50 text-sm text-slate-500 hover:text-teal-700 py-2 flex items-center justify-center gap-2 transition">${icon('plus')}Add gift</button>
+    ${past.length ? `<details class="mt-3"><summary class="text-xs text-slate-500 flex items-center gap-1">${icon('history', 'w-3.5 h-3.5')} Previously given (avoid repeats)<span class="chev transition">${icon('chevron-down', 'w-3.5 h-3.5')}</span></summary>
+      <ul class="mt-2 text-xs text-slate-600 space-y-1 pl-5 list-disc">${past.map(h => `<li>${esc(h.year)} ${esc(h.occasion || '')}: ${esc(h.gift)}</li>`).join('')}</ul></details>` : ''}
+  </article>`;
+}
+
+/* ---------- 6.5 HOUSEHOLD VAULT ---------- */
+function vaultMatches(v) {
+  const q = ui.vaultSearch.trim().toLowerCase();
+  if (ui.vaultCat !== 'all' && v.category !== ui.vaultCat) return false;
+  if (!q) return true;
+  return [v.provider, v.name, v.accountNo, v.location, v.notes, (VAULT_CAT[v.category] || {}).label].some(x => String(x || '').toLowerCase().includes(q));
+}
+function vaultListHTML() {
+  const items = state.vault.filter(vaultMatches).sort((a, b) => (a.renewalDate || '9999') < (b.renewalDate || '9999') ? -1 : 1);
+  if (!items.length) return `<div class="${CARD}">${emptyBox('search', state.vault.length ? 'No matches' : 'Your vault is empty', state.vault.length ? 'Try a different search or category.' : 'Add mortgages, insurance, utilities and savings so you both know where everything lives.', state.vault.length ? '' : `<button type="button" data-action="vault-new" class="${BTN_SOFT}">${icon('plus')}Add first entry</button>`)}</div>`;
+  const cats = ui.vaultCat === 'all' ? VAULT_CATS : [VAULT_CAT[ui.vaultCat]];
+  return cats.map(c => {
+    const group = items.filter(v => (VAULT_CAT[v.category] ? v.category : 'other') === c.id);
+    if (!group.length) return '';
+    return `<section class="mb-6">
+      <h3 class="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3"><span class="w-7 h-7 rounded-lg ${c.bg} ${c.fg} flex items-center justify-center">${icon(c.icon, 'w-4 h-4')}</span>${c.label}<span class="text-slate-400 font-normal">${group.length}</span></h3>
+      <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">${group.map(vaultCard).join('')}</div>
+    </section>`;
+  }).join('');
+}
+function vaultCard(v) {
+  const c = VAULT_CAT[v.category] || VAULT_CAT.other;
+  const cost = num(v.cost), monthly = v.costPeriod === 'monthly';
+  const url = safeUrl(v.url);
+  return `<article class="${CARD} p-4 flex flex-col gap-3">
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-xl ${c.bg} ${c.fg} flex items-center justify-center shrink-0">${icon(c.icon, 'w-5 h-5')}</div>
+      <div class="flex-1 min-w-0"><h4 class="font-semibold text-slate-900 break-words">${esc(v.provider)}</h4><p class="text-xs text-slate-500 break-words">${esc(v.name || c.label)}</p></div>
+      ${renewalBadge(v.renewalDate)}
+    </div>
+    <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+      <div class="col-span-2"><dt class="text-xs text-slate-500">Policy / account number</dt>
+        <dd class="flex items-center gap-1 font-mono text-[13px] text-slate-800 break-all">${v.accountNo ? `${esc(v.accountNo)}<button type="button" data-action="copy" data-val="${esc(v.accountNo)}" class="${ICON_BTN} !w-7 !h-7" aria-label="Copy number">${icon('copy', 'w-3.5 h-3.5')}</button>` : '—'}</dd></div>
+      <div><dt class="text-xs text-slate-500">Renewal / end date</dt><dd class="text-slate-800">${fmtDate(v.renewalDate)}</dd></div>
+      <div><dt class="text-xs text-slate-500">Auto-renew</dt><dd>${v.autoRenew ? pill('Yes', 'bg-emerald-50 text-emerald-700 ring-emerald-200') : pill('No', 'bg-rose-50 text-rose-700 ring-rose-200')}</dd></div>
+      <div class="col-span-2"><dt class="text-xs text-slate-500">Cost</dt><dd class="text-slate-800">${cost ? `<span class="font-semibold">${money(cost)}</span> / ${monthly ? 'month' : 'year'} <span class="text-xs text-slate-400">(≈ ${monthly ? money(cost * 12) + ' a year' : money(cost / 12) + ' a month'})</span>` : '—'}</dd></div>
+    </dl>
+    ${v.location ? `<div class="rounded-xl bg-teal-50 ring-1 ring-teal-100 p-3 flex gap-2.5">
+        <span class="text-teal-600 mt-0.5">${icon('map-pin', 'w-4 h-4')}</span>
+        <div><p class="text-[11px] font-semibold text-teal-800 uppercase tracking-wider">Where to find it</p><p class="text-sm text-teal-900 break-words">${esc(v.location)}</p></div></div>`
+      : `<button type="button" data-action="vault-edit" data-id="${v.id}" class="rounded-xl bg-amber-50 ring-1 ring-amber-100 p-3 text-left text-sm text-amber-800 flex gap-2">${icon('map-pin', 'w-4 h-4 mt-0.5')}Add where the documents are kept</button>`}
+    ${v.notes ? `<p class="text-sm text-slate-600 whitespace-pre-line bg-slate-50 rounded-xl p-3 break-words">${esc(v.notes)}</p>` : ''}
+    <div class="flex items-center gap-2 pt-1 mt-auto">
+      ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="${BTN_SOFT} !py-1.5 !text-xs">${icon('external-link', 'w-3.5 h-3.5')}Login / portal</a>` : ''}
+      <button type="button" data-action="vault-edit" data-id="${v.id}" class="${ICON_BTN} ml-auto" aria-label="Edit">${icon('pencil')}</button>
+      <button type="button" data-action="vault-delete" data-id="${v.id}" class="${ICON_BTN} -mr-2 hover:!text-rose-600" aria-label="Delete">${icon('trash-2')}</button>
+    </div>
+  </article>`;
+}
+function renderVault() {
+  const V = state.vault;
+  const monthlyTotal = sum(V, v => v.costPeriod === 'monthly' ? num(v.cost) : num(v.cost) / 12);
+  const soon = V.filter(v => { const d = daysUntil(v.renewalDate); return d !== null && d < 60; }).length;
+  const noLoc = V.filter(v => !v.location).length;
+  return `
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Entries</p><p class="text-2xl font-bold text-slate-900 mt-1">${V.length}</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Monthly outgoings</p><p class="text-2xl font-bold text-slate-900 mt-1">${money(monthlyTotal)}</p><p class="text-xs text-slate-500">${money(monthlyTotal * 12)} a year</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Renewing within 60 days</p><p class="text-2xl font-bold ${soon ? 'text-amber-600' : 'text-slate-900'} mt-1">${soon}</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Missing "where to find it"</p><p class="text-2xl font-bold ${noLoc ? 'text-rose-600' : 'text-emerald-600'} mt-1">${noLoc}</p></div>
+  </div>
+  <div class="flex flex-col sm:flex-row gap-2 mb-3">
+    <div class="relative flex-1"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">${icon('search')}</span>
+      <input data-input="vault-search" value="${esc(ui.vaultSearch)}" placeholder="Search provider, policy number, location…" class="${INPUT} pl-9"></div>
+    <button type="button" data-action="vault-new" class="${BTN_PRIMARY}">${icon('plus')}Add entry</button>
+  </div>
+  <div class="mb-5">${filterPills([['all', 'All', V.length], ...VAULT_CATS.map(c => [c.id, c.label, V.filter(v => v.category === c.id).length])], ui.vaultCat, 'vault-cat')}</div>
+  <div id="vault-list">${vaultListHTML()}</div>`;
+}
+
+/* ---------- 6.6 SETTINGS ---------- */
+function syncStatusHTML(compact) {
+  const s = Sync.status;
+  const map = {
+    off:     ['cloud-off', 'text-slate-400', 'Local only'],
+    connecting: ['refresh-cw', 'text-sky-500 animate-spin', 'Connecting…'],
+    live:    ['cloud', 'text-emerald-500', 'Synced'],
+    pending: ['refresh-cw', 'text-amber-500', 'Saving…'],
+    error:   ['cloud-off', 'text-rose-500', 'Sync error']
+  };
+  const [i, c, l] = map[s] || map.off;
+  return `<span class="inline-flex items-center gap-1.5 text-xs ${compact ? 'text-slate-500 px-2' : 'text-slate-500'}" title="${esc(Sync.message || l)}">${icon(i, 'w-4 h-4 ' + c)}${l}</span>`;
+}
+function renderSettings() {
+  const sc = state.settings.sync;
+  const sampleCount = state.tasks.filter(x => x.sample).length + state.checklists.filter(x => x.sample).length + state.people.filter(x => x.sample).length + state.vault.filter(x => x.sample).length + state.christmas.recipients.filter(x => x.sample).length;
+  return `
+  <div class="grid lg:grid-cols-2 gap-4 items-start">
+    <section class="${CARD} p-5 lg:row-span-2">
+      <div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('cloud', 'w-5 h-5 text-teal-600')} Live cloud sync <span class="text-xs font-normal text-slate-400">(optional)</span></h3>${syncStatusHTML()}</div>
+      <p class="text-sm text-slate-500 mb-4">Connect both phones to the same free database so changes appear automatically. Leave this off to keep data on this device only and share via Backup files.</p>
+      <form data-form="sync-settings" class="space-y-4">
+        <div>
+          <span class="block text-sm font-medium text-slate-700 mb-1.5">Provider</span>
+          <div class="grid grid-cols-2 gap-2">
+            ${[['firebase', 'Firebase Realtime DB', 'Instant (live)'], ['supabase', 'Supabase', 'Every 10 seconds']].map(([v, l, h]) => `
+              <label class="rounded-xl ring-1 ring-slate-200 p-3 cursor-pointer has-[:checked]:ring-2 has-[:checked]:ring-teal-500 has-[:checked]:bg-teal-50/50">
+                <input type="radio" name="provider" value="${v}" ${sc.provider === v ? 'checked' : ''} class="accent-teal-600"> <span class="text-sm font-medium">${l}</span><span class="block text-xs text-slate-500 mt-0.5 pl-5">${h}</span></label>`).join('')}
+          </div>
+        </div>
+        ${field('Database / project URL', inp('url', sc.url, 'type="url" placeholder="https://your-project-default-rtdb.europe-west1.firebasedatabase.app"'), 'Firebase: the Realtime Database URL. Supabase: the Project URL.')}
+        ${field('Key / token', inp('key', sc.key, 'type="password" placeholder="Supabase anon key (Firebase: leave blank unless using auth)"'), 'Stored on this device only – never included in exports.')}
+        ${field('Household ID (shared secret)', `<div class="flex gap-2">${inp('householdId', sc.householdId, 'placeholder="e.g. home-k3j9x2m1q8vz" pattern="[A-Za-z0-9_-]{6,64}"')}<button type="button" data-action="sync-genid" class="${BTN_GHOST} shrink-0">${icon('sparkles')}Generate</button></div>`, 'Use the SAME ID on both phones. Treat it like a password – anyone with the URL and ID can read the data.')}
+        ${chk('enabled', 'Enable automatic sync on this device', sc.enabled)}
+        <div class="flex flex-wrap gap-2">
+          <button type="submit" class="${BTN_PRIMARY}">${icon('check')}Save &amp; connect</button>
+          ${sc.enabled ? `<button type="button" data-action="sync-now" class="${BTN_GHOST}">${icon('refresh-cw')}Sync now</button>
+          <button type="button" data-action="sync-copy-link" class="${BTN_GHOST}">${icon('smartphone')}Copy setup link for partner</button>` : ''}
+        </div>
+        ${sc.lastSync ? `<p class="text-xs text-slate-500">Last synced ${new Date(sc.lastSync).toLocaleString('en-GB')}</p>` : ''}
+        ${Sync.message && Sync.status === 'error' ? `<p class="text-xs text-rose-600">${esc(Sync.message)}</p>` : ''}
+      </form>
+      <details class="mt-5 rounded-xl bg-slate-50 p-4">
+        <summary class="text-sm font-medium text-slate-700 flex items-center justify-between">How to set up Firebase (free)<span class="chev transition">${icon('chevron-down')}</span></summary>
+        <ol class="mt-3 text-sm text-slate-600 list-decimal pl-5 space-y-1.5">
+          <li>Go to <a class="text-teal-700 underline" href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer">console.firebase.google.com</a> → <b>Add project</b> (Analytics not needed).</li>
+          <li>Build → <b>Realtime Database</b> → <b>Create database</b> → choose a location (e.g. europe-west1) → start in <b>locked mode</b>.</li>
+          <li>Open the <b>Rules</b> tab, paste the rules below and <b>Publish</b>.</li>
+          <li>Copy the database URL shown at the top of the Data tab into the box above.</li>
+          <li>Click <b>Generate</b> for a Household ID, tick Enable, then <b>Save &amp; connect</b>.</li>
+          <li>Tap <b>Copy setup link for partner</b> and send it to the other phone – opening it connects that device automatically.</li>
+        </ol>
+        <pre class="mt-3 bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto"><code>{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "households": {
+      "$householdId": { ".read": true, ".write": true }
+    }
+  }
+}</code></pre>
+        <p class="text-xs text-slate-500 mt-2">These rules block listing the whole database, so only someone who knows your Household ID can read it. Do not store passwords in the app.</p>
+      </details>
+      <details class="mt-3 rounded-xl bg-slate-50 p-4">
+        <summary class="text-sm font-medium text-slate-700 flex items-center justify-between">How to set up Supabase instead<span class="chev transition">${icon('chevron-down')}</span></summary>
+        <ol class="mt-3 text-sm text-slate-600 list-decimal pl-5 space-y-1.5">
+          <li>Create a free project at <a class="text-teal-700 underline" href="https://supabase.com" target="_blank" rel="noopener noreferrer">supabase.com</a>.</li>
+          <li>SQL Editor → run the script below.</li>
+          <li>Project Settings → API: copy the <b>Project URL</b> and <b>anon public</b> key into the boxes above.</li>
+        </ol>
+        <pre class="mt-3 bg-slate-900 text-slate-100 rounded-lg p-3 overflow-x-auto"><code>create table if not exists household_sync (
+  id text primary key,
+  payload text not null,
+  updated_at bigint not null,
+  updated_by text
+);
+alter table household_sync enable row level security;
+create policy "household read/write" on household_sync
+  for all to anon using (true) with check (true);</code></pre>
+      </details>
+    </section>
+
+    <section class="${CARD} p-5">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-1">${icon('database', 'w-5 h-5 text-sky-600')} Backup &amp; share</h3>
+      <p class="text-sm text-slate-500 mb-4">Data saves automatically on this device. Export a JSON file to back up or send to your partner.</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" data-action="export-json" class="${BTN_SOFT}">${icon('download')}Export data (JSON)</button>
+        <button type="button" data-action="import-json" class="${BTN_GHOST}">${icon('upload')}Import data (JSON)</button>
+      </div>
+    </section>
+
+    <section class="${CARD} p-5">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-1">${icon('sparkles', 'w-5 h-5 text-amber-500')} Sample data &amp; reset</h3>
+      <p class="text-sm text-slate-500 mb-4">${sampleCount ? `${sampleCount} sample entries are loaded so you can try every feature.` : 'No sample entries are loaded.'}</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" data-action="clear-sample" class="${BTN_GHOST}" ${sampleCount ? '' : 'disabled style="opacity:.5"'}>${icon('eraser')}Clear sample data</button>
+        <button type="button" data-action="load-sample" class="${BTN_GHOST}">${icon('rotate-ccw')}Reload sample data</button>
+        <button type="button" data-action="reset-all" class="${BTN_DANGER}">${icon('trash-2')}Erase everything</button>
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ============================== 7. FORMS ============================== */
+function taskForm(id) {
+  const t = id ? byId(state.tasks, id) : null;
+  openModal({
+    title: t ? 'Edit task' : 'New task', submitLabel: t ? 'Save' : 'Add task',
+    body: `${field('Task', inp('title', t?.title, 'required placeholder="What needs doing?"'))}
+      <div class="grid grid-cols-2 gap-3">${field('Due date', inp('due', t?.due, 'type="date"'))}
+      ${field('Priority', sel('priority', Object.entries(PRIORITIES).map(([k, v]) => [k, v.label]), t?.priority || 'medium'))}</div>
+      ${field('Category', sel('category', Object.entries(TASK_CATS), t?.category || 'general'))}
+      ${field('Notes', ta('notes', t?.notes, 'placeholder="Optional"'))}`,
+    onSubmit: fd => {
+      const data = { title: fd.get('title').trim(), due: fd.get('due') || '', priority: fd.get('priority'), category: fd.get('category'), notes: fd.get('notes').trim() };
+      const cur = id ? byId(state.tasks, id) : null;
+      if (cur) Object.assign(cur, data, { updatedAt: Date.now() });
+      else state.tasks.push(touch({ id: uid(), done: false, ...data }));
+      commit(); toast(cur ? 'Task updated' : 'Task added');
+    }
+  });
+}
+
+function checklistForm(id) {
+  const c = id ? byId(state.checklists, id) : null;
+  openModal({
+    title: c ? 'Edit checklist' : 'New checklist', submitLabel: c ? 'Save' : 'Create',
+    body: `${field('Title', inp('title', c?.title, 'required placeholder="e.g. Holiday Packing"'))}
+      ${chk('reusable', 'Reusable template', c ? c.reusable : true, 'Keep it and reset the ticks each time (e.g. Food Shop).')}
+      ${c ? '' : field('Items', ta('items', '', 'rows="6" placeholder="One item per line"'), 'You can add more items later.')}`,
+    onSubmit: fd => {
+      const cur = id ? byId(state.checklists, id) : null;
+      if (cur) { cur.title = fd.get('title').trim(); cur.reusable = fd.get('reusable') === 'on'; touch(cur); }
+      else {
+        const items = String(fd.get('items') || '').split('\n').map(s => s.trim()).filter(Boolean).map(text => ({ id: uid(), text, done: false }));
+        state.checklists.unshift(touch({ id: uid(), title: fd.get('title').trim(), reusable: fd.get('reusable') === 'on', items }));
+        ui.tasksTab = 'checklists';
+        if (route() !== 'tasks') location.hash = '#/tasks';
+      }
+      commit();
+    }
+  });
+}
+
+function personForm(id) {
+  const p = id ? byId(state.people, id) : null;
+  openModal({
+    title: p ? 'Edit person' : 'Add birthday', submitLabel: p ? 'Save' : 'Add',
+    body: `${field('Name', inp('name', p?.name, 'required placeholder="e.g. Auntie Sue"'))}
+      ${field('Relationship', inp('relationship', p?.relationship, 'placeholder="e.g. Aunt, Friend, Colleague" list="rel-list"') + `<datalist id="rel-list">${['Mother', 'Father', 'Sister', 'Brother', 'Son', 'Daughter', 'Grandparent', 'Aunt', 'Uncle', 'Cousin', 'Niece', 'Nephew', 'Friend', 'Godchild', 'Colleague'].map(x => `<option value="${x}">`).join('')}</datalist>`)}
+      ${field('Date of birth', inp('dob', p?.dob, 'type="date" required'), 'If you don\'t know the year, pick any year and tick the box below.')}
+      ${chk('yearUnknown', 'Birth year unknown (don\'t show age)', p ? p.yearKnown === false : false)}
+      ${field('Notes', ta('notes', p?.notes, 'placeholder="Likes, sizes, allergies…"'))}`,
+    onSubmit: fd => {
+      const data = { name: fd.get('name').trim(), relationship: fd.get('relationship').trim(), dob: fd.get('dob'), yearKnown: fd.get('yearUnknown') !== 'on', notes: fd.get('notes').trim() };
+      const cur = id ? byId(state.people, id) : null;
+      if (cur) { const dobChanged = cur.dob !== data.dob; Object.assign(cur, data); if (dobChanged) cur.cycleFor = nextBirthday(cur).date; touch(cur); }
+      else { const np = { id: uid(), ideas: [], history: [], finalGift: null, cardBought: false, cardSent: false, ...data }; np.cycleFor = nextBirthday(np).date; state.people.push(touch(np)); ui.personOpen[np.id] = true; }
+      commit(); toast(cur ? 'Saved' : 'Birthday added');
+    }
+  });
+}
+
+function finalGiftForm(pid) {
+  const p = byId(state.people, pid); if (!p) return;
+  const fg = p.finalGift;
+  openModal({
+    title: fg ? 'Edit final gift' : 'Custom final gift',
+    body: `${field('Gift', inp('title', fg?.title, 'required placeholder="What are you giving?"'))}
+      <div class="grid grid-cols-2 gap-3">${field('Price', moneyInp('price', fg?.price))}
+      ${field('Status', sel('status', GIFT_STATUS.map(s => [s.id, s.label]), fg?.status || 'idea'))}</div>`,
+    onSubmit: fd => {
+      const pp = byId(state.people, pid); if (!pp) return;
+      pp.finalGift = { title: fd.get('title').trim(), price: num(fd.get('price')), status: fd.get('status'), ideaId: pp.finalGift?.ideaId || null };
+      touch(pp); commit();
+    }
+  });
+}
+
+function historyForm(pid) {
+  const y = new Date().getFullYear();
+  openModal({
+    title: 'Add past gift',
+    body: `${field('Gift', inp('gift', '', 'required placeholder="What did you give?"'))}
+      <div class="grid grid-cols-3 gap-3">${field('Year', sel('year', Array.from({ length: 15 }, (_, i) => [y - i, y - i]), y - 1))}
+      ${field('Occasion', sel('occasion', [['Birthday', 'Birthday'], ['Christmas', 'Christmas'], ['Other', 'Other']], 'Birthday'))}
+      ${field('Price', moneyInp('price', ''))}</div>
+      ${field('Notes', inp('notes', '', 'placeholder="Optional – e.g. they loved it"'))}`,
+    onSubmit: fd => {
+      const p = byId(state.people, pid); if (!p) return;
+      p.history.push({ id: uid(), gift: fd.get('gift').trim(), year: Number(fd.get('year')), occasion: fd.get('occasion'), price: num(fd.get('price')), notes: fd.get('notes').trim() });
+      touch(p); commit();
+    }
+  });
+}
+
+function budgetForm() {
+  openModal({
+    title: `Christmas ${state.christmas.year} budget`,
+    body: `${field('Overall budget', moneyInp('budget', state.christmas.budget || ''))}
+      ${field('Year', inp('year', state.christmas.year, 'type="number" min="2000" max="2100" required'))}`,
+    onSubmit: fd => { state.christmas.budget = num(fd.get('budget')); state.christmas.year = Number(fd.get('year')) || state.christmas.year; delete state.christmas.sampleBudget; commit(); }
+  });
+}
+
+function recipientForm(id) {
+  const r = id ? byId(state.christmas.recipients, id) : null;
+  openModal({
+    title: r ? 'Edit recipient' : 'Add Christmas recipient', submitLabel: r ? 'Save' : 'Add',
+    body: `${field('Name', inp('name', r?.name, 'required placeholder="e.g. Mrs Jones (teacher)"'))}
+      ${field('Target budget', moneyInp('budget', r?.budget))}
+      ${field('Notes', inp('notes', r?.notes, 'placeholder="Optional – sizes, Secret Santa limit…"'))}`,
+    onSubmit: fd => {
+      const data = { name: fd.get('name').trim(), budget: num(fd.get('budget')), notes: fd.get('notes').trim() };
+      const cur = id ? byId(state.christmas.recipients, id) : null;
+      if (cur) Object.assign(cur, data, { updatedAt: Date.now() });
+      else state.christmas.recipients.push(touch({ id: uid(), personId: null, gifts: [], ...data }));
+      commit();
+    }
+  });
+}
+
+function xmasGiftForm(rid, gid) {
+  const R = state.christmas.recipients;
+  const r = rid ? byId(R, rid) : null;
+  const g = r && gid ? byId(r.gifts, gid) : null;
+  const recipientPicker = r ? '' : field('For', sel('rid', [...R.map(x => [x.id, x.name]), ['__new', '+ New recipient…']], R[0]?.id || '__new'))
+    + `<div data-newname class="${R.length ? 'hidden' : ''}">${field('New recipient name', inp('newName', '', 'placeholder="Name"'))}</div>`;
+  openModal({
+    title: g ? 'Edit gift' : `Add gift${r ? ' for ' + esc(r.name) : ''}`, submitLabel: g ? 'Save' : 'Add gift',
+    body: `${recipientPicker}
+      ${field('Gift', inp('title', g?.title, 'required placeholder="e.g. Cosy slippers"'))}
+      <div class="grid grid-cols-2 gap-3">${field('Price', moneyInp('price', g?.price))}
+      ${field('Status', sel('status', XMAS_STATUS.map(s => [s.id, s.label]), g?.status || 'idea'))}</div>
+      ${field('Link', inp('link', g?.link, 'placeholder="Optional shop link"'))}`,
+    onSubmit: fd => {
+      let rr = rid ? byId(state.christmas.recipients, rid) : null;
+      if (!rr) {
+        const sid = fd.get('rid');
+        if (sid && sid !== '__new') rr = byId(state.christmas.recipients, sid);
+        else {
+          const nm = String(fd.get('newName') || '').trim();
+          if (!nm) { toast('Enter a name for the new recipient', 'error'); return false; }
+          rr = touch({ id: uid(), name: nm, personId: null, budget: 0, notes: '', gifts: [] });
+          state.christmas.recipients.push(rr);
+        }
+      }
+      if (!rr) return;
+      const data = { title: fd.get('title').trim(), price: num(fd.get('price')), status: fd.get('status'), link: fd.get('link').trim() };
+      const cur = gid ? byId(rr.gifts, gid) : null;
+      if (cur) Object.assign(cur, data); else rr.gifts.push({ id: uid(), ...data });
+      touch(rr); commit();
+      if (route() !== 'christmas') toast(`Gift added for ${rr.name}`);
+    }
+  });
+  const s = $('#modal-form select[name=rid]');
+  if (s) s.addEventListener('change', () => $('#modal-form [data-newname]').classList.toggle('hidden', s.value !== '__new'));
+}
+
+function importRecipientsForm() {
+  const linked = new Set(state.christmas.recipients.map(r => r.personId).filter(Boolean));
+  const avail = state.people.filter(p => !linked.has(p.id)).sort((a, b) => a.name.localeCompare(b.name));
+  if (!avail.length) { toast(state.people.length ? 'Everyone on the birthday list is already added' : 'Your birthday list is empty'); return; }
+  openModal({
+    title: 'Import from birthday list', submitLabel: 'Import selected',
+    body: `<div class="flex justify-between items-center"><p class="text-sm text-slate-500">Choose who to add to Christmas ${state.christmas.year}.</p>
+        <button type="button" data-action="select-all" class="text-sm text-teal-700 font-medium">Select all</button></div>
+      <div class="space-y-2">${avail.map(p => `<label class="flex items-center gap-3 rounded-xl ring-1 ring-slate-200 px-3 py-2.5 cursor-pointer has-[:checked]:ring-teal-400 has-[:checked]:bg-teal-50/50">
+        <input type="checkbox" name="pid" value="${p.id}" class="w-5 h-5 accent-teal-600">
+        <span class="w-8 h-8 rounded-full ${avatarCls(p.name)} flex items-center justify-center text-xs font-semibold">${initials(p.name)}</span>
+        <span class="text-sm font-medium text-slate-800">${esc(p.name)}<span class="block text-xs font-normal text-slate-500">${esc(p.relationship || '')}</span></span></label>`).join('')}</div>
+      ${field('Default target budget each', moneyInp('budget', ''))}`,
+    onSubmit: fd => {
+      const ids = fd.getAll('pid');
+      if (!ids.length) { toast('Select at least one person', 'error'); return false; }
+      const b = num(fd.get('budget'));
+      ids.forEach(pid => { const p = byId(state.people, pid); if (p) state.christmas.recipients.push(touch({ id: uid(), name: p.name, personId: p.id, budget: b, notes: '', gifts: [] })); });
+      commit(); toast(`${ids.length} recipient${ids.length > 1 ? 's' : ''} added`);
+    }
+  });
+}
+
+function vaultForm(id) {
+  const v = id ? byId(state.vault, id) : null;
+  openModal({
+    title: v ? 'Edit vault entry' : 'Add to Household Vault', submitLabel: v ? 'Save' : 'Add entry', wide: true,
+    body: `<div class="grid sm:grid-cols-2 gap-4">
+        ${field('Category', sel('category', VAULT_CATS.map(c => [c.id, c.label]), v?.category || ui.vaultCat !== 'all' && ui.vaultCat || 'home'))}
+        ${field('Provider name', inp('provider', v?.provider, 'required placeholder="e.g. Aviva"'))}
+        ${field('Description', inp('name', v?.name, 'placeholder="e.g. Buildings & contents"'))}
+        ${field('Policy / account number', inp('accountNo', v?.accountNo, 'placeholder="e.g. AV-123456"'))}
+        ${field('Renewal / end date', inp('renewalDate', v?.renewalDate, 'type="date"'))}
+        <div>${field('Cost', `<div class="flex gap-2">${moneyInp('cost', v?.cost)}<div class="flex rounded-xl bg-slate-100 p-1 shrink-0">
+          ${[['monthly', 'Monthly'], ['annual', 'Annual']].map(([k, l]) => `<label class="cursor-pointer"><input type="radio" name="costPeriod" value="${k}" class="peer sr-only" ${(v?.costPeriod || 'monthly') === k ? 'checked' : ''}><span class="block rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-slate-900">${l}</span></label>`).join('')}</div></div>`)}</div>
+      </div>
+      ${chk('autoRenew', 'Auto-renews', v ? v.autoRenew : true, 'Untick if it ends or needs action (e.g. fixed-rate mortgage reverting to SVR).')}
+      <div class="rounded-xl bg-teal-50 p-3 ring-1 ring-teal-100">${field(`${icon('map-pin', 'w-4 h-4 inline -mt-0.5 text-teal-600')} Where to find it`, inp('location', v?.location, 'placeholder="e.g. Blue folder in study filing cabinet / Joint Gmail – search \'Aviva\' / 1Password Shared Vault"'), 'Exactly where the paperwork, emails or logins live.')}</div>
+      ${field('Login / portal URL', inp('url', v?.url, 'placeholder="https://…"'))}
+      ${field('Notes', ta('notes', v?.notes, 'placeholder="Excess amounts, cancellation notice period, broker contact…"'))}`,
+    onSubmit: fd => {
+      const data = { category: fd.get('category'), provider: fd.get('provider').trim(), name: fd.get('name').trim(), accountNo: fd.get('accountNo').trim(), renewalDate: fd.get('renewalDate') || '',
+        cost: num(fd.get('cost')), costPeriod: fd.get('costPeriod') || 'monthly', autoRenew: fd.get('autoRenew') === 'on', location: fd.get('location').trim(), url: fd.get('url').trim(), notes: fd.get('notes').trim() };
+      const cur = id ? byId(state.vault, id) : null;
+      if (cur) Object.assign(cur, data, { updatedAt: Date.now() }); else state.vault.push(touch({ id: uid(), ...data }));
+      commit(); toast(cur ? 'Saved' : 'Added to vault');
+    }
+  });
+}
+
+function openQuickAdd() {
+  const tiles = [['quick-task', 'list-todo', 'Task', 'bg-teal-50 text-teal-600'], ['cl-new', 'list-checks', 'Checklist', 'bg-sky-50 text-sky-600'], ['person-new', 'cake', 'Birthday', 'bg-violet-50 text-violet-600'],
+    ['xmas-gift-new', 'gift', 'Christmas gift', 'bg-emerald-50 text-emerald-600'], ['xmas-recipient-new', 'user-plus', 'Christmas recipient', 'bg-rose-50 text-rose-600'], ['vault-new', 'shield-check', 'Policy / account', 'bg-amber-50 text-amber-600']];
+  openModal({
+    title: 'Quick add',
+    body: `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">${tiles.map(([a, i, l, c]) => `
+      <button type="button" data-action="${a}" class="rounded-2xl ring-1 ring-slate-200 hover:ring-teal-300 hover:bg-slate-50 p-4 flex flex-col items-center gap-2 transition">
+        <span class="w-11 h-11 rounded-xl ${c} flex items-center justify-center">${icon(i, 'w-5 h-5')}</span><span class="text-sm font-medium text-slate-700 text-center">${l}</span></button>`).join('')}</div>`
+  });
+}
+
+/* ========================= 8. BACKUP / SHARE ========================= */
+function backupFile() {
+  const payload = { app: 'home-hub', format: 1, exportedAt: new Date().toISOString(), data: exportable() };
+  const name = `home-hub-backup-${todayStr()}.json`;
+  return { name, blob: new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }) };
+}
+function exportJSON() {
+  const { name, blob } = backupFile();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('Backup downloaded');
+}
+async function shareJSON() {
+  const { name, blob } = backupFile();
+  const file = new File([blob], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Home Hub backup' }); }
+    else exportJSON();
+  } catch (e) { if (e.name !== 'AbortError') exportJSON(); }
+}
+function openBackupModal() {
+  const sc = state.settings.sync;
+  const canShare = !!(navigator.canShare && window.File);
+  openModal({
+    title: 'Backup / Sync',
+    body: `
+      <div class="rounded-xl ${sc.enabled ? 'bg-emerald-50 ring-emerald-100' : 'bg-slate-50 ring-slate-200'} ring-1 p-3 flex items-center gap-3">
+        ${syncStatusHTML()}
+        <p class="text-xs text-slate-600 flex-1">${sc.enabled ? `Live sync is on (${sc.provider === 'firebase' ? 'Firebase' : 'Supabase'}). Changes are shared automatically.` : 'Data is saved on this device. Use the buttons below to share with your partner, or set up live sync in Settings.'}</p>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <button type="button" data-action="export-json" class="rounded-2xl ring-1 ring-slate-200 hover:ring-teal-300 p-4 text-left transition">
+          <span class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-2">${icon('download', 'w-5 h-5')}</span>
+          <span class="block font-semibold text-slate-800">Export data (JSON)</span><span class="block text-xs text-slate-500 mt-0.5">Download a backup file</span></button>
+        <button type="button" data-action="import-json" class="rounded-2xl ring-1 ring-slate-200 hover:ring-teal-300 p-4 text-left transition">
+          <span class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-2">${icon('upload', 'w-5 h-5')}</span>
+          <span class="block font-semibold text-slate-800">Import data (JSON)</span><span class="block text-xs text-slate-500 mt-0.5">Load a file from your partner</span></button>
+      </div>
+      ${canShare ? `<button type="button" data-action="share-json" class="${BTN_GHOST} w-full">${icon('share-2')}Share backup file (WhatsApp, email, AirDrop…)</button>` : ''}
+      <div class="flex flex-wrap gap-2 justify-between items-center pt-2 border-t border-slate-100">
+        <p class="text-xs text-slate-500">Last change: ${new Date(state.meta.updatedAt).toLocaleString('en-GB')}</p>
+        ${sc.enabled ? `<button type="button" data-action="sync-now" class="${BTN_SOFT} !py-1.5">${icon('refresh-cw', 'w-3.5 h-3.5')}Sync now</button>`
+          : `<a href="#/settings" data-action="close-modal" class="${BTN_SOFT} !py-1.5">${icon('cloud', 'w-3.5 h-3.5')}Set up live sync</a>`}
+      </div>`
+  });
+}
+
+/** Parse an imported file and ask whether to replace or merge. */
+function handleImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let obj;
+    try { obj = JSON.parse(reader.result); } catch (e) { toast('That file is not valid JSON', 'error'); return; }
+    const data = obj && obj.data ? obj.data : obj;
+    if (!data || !Array.isArray(data.tasks) || !Array.isArray(data.people) || !Array.isArray(data.vault)) { toast('This does not look like a Home Hub backup', 'error'); return; }
+    const when = obj.exportedAt ? new Date(obj.exportedAt).toLocaleString('en-GB') : 'unknown date';
+    openModal({
+      title: 'Import backup',
+      body: `<p class="text-sm text-slate-600">Backup from <b>${esc(when)}</b> containing ${data.tasks.length} tasks, ${data.people.length} people, ${(data.christmas?.recipients || []).length} Christmas recipients and ${data.vault.length} vault entries.</p>
+        <div class="grid gap-3">
+          <button type="button" data-action="import-replace" class="rounded-2xl ring-1 ring-slate-200 hover:ring-teal-300 p-4 text-left">
+            <span class="font-semibold text-slate-800 flex items-center gap-2">${icon('refresh-cw', 'w-4 h-4 text-teal-600')}Replace my data</span>
+            <span class="block text-xs text-slate-500 mt-1">Best when your partner has the latest version. Your current data is overwritten.</span></button>
+          <button type="button" data-action="import-merge" class="rounded-2xl ring-1 ring-slate-200 hover:ring-teal-300 p-4 text-left">
+            <span class="font-semibold text-slate-800 flex items-center gap-2">${icon('git-merge', 'w-4 h-4 text-sky-600')}Merge with my data</span>
+            <span class="block text-xs text-slate-500 mt-1">Adds anything new and keeps the most recently edited version of each item. Deletions are not carried across.</span></button>
+        </div>`
+    });
+    pendingImport = data;
+  };
+  reader.readAsText(file);
+}
+let pendingImport = null;
+function mergeArrays(local, incoming) {
+  const map = new Map(local.map(x => [x.id, x]));
+  (incoming || []).forEach(x => {
+    if (!x || !x.id) return;
+    const cur = map.get(x.id);
+    if (!cur || (x.updatedAt || 0) > (cur.updatedAt || 0)) map.set(x.id, x);
+  });
+  return Array.from(map.values());
+}
+function applyImport(mode) {
+  const data = pendingImport; pendingImport = null;
+  if (!data) return;
+  if (mode === 'replace') {
+    const keep = state.settings;
+    state = normalise({ ...clone(data), settings: keep });
+  } else {
+    const inc = normalise(clone(data));
+    state.tasks = mergeArrays(state.tasks, inc.tasks);
+    state.checklists = mergeArrays(state.checklists, inc.checklists);
+    state.people = mergeArrays(state.people, inc.people);
+    state.vault = mergeArrays(state.vault, inc.vault);
+    if (inc.christmas.year === state.christmas.year) {
+      state.christmas.recipients = mergeArrays(state.christmas.recipients, inc.christmas.recipients);
+      if (!state.christmas.budget) state.christmas.budget = inc.christmas.budget;
+    }
+  }
+  ensureCycles();
+  closeModal(); commit();
+  toast(mode === 'replace' ? 'Data replaced from backup' : 'Backup merged');
+}
+
+/* =========================== 9. CLOUD SYNC =========================== */
+/* Whole-document, last-write-wins sync. Data is stored as a JSON string so
+   Firebase never mangles arrays/empty values. Device-specific sync settings
+   (URL, key) are never uploaded. */
+const Sync = {
+  status: 'off', message: '', es: null, pushTimer: null, pollTimer: null,
+  cfg() { return state.settings.sync; },
+  enabled() { const c = this.cfg(); return !!(c.enabled && c.url && c.householdId); },
+  base() { return String(this.cfg().url).trim().replace(/\/+$/, ''); },
+  fbUrl() {
+    const c = this.cfg();
+    return `${this.base()}/households/${encodeURIComponent(c.householdId.trim())}.json${c.key ? '?auth=' + encodeURIComponent(c.key.trim()) : ''}`;
+  },
+  sbHeaders() { const k = this.cfg().key.trim(); return { apikey: k, Authorization: 'Bearer ' + k }; },
+  setStatus(s, msg = '') { this.status = s; this.message = msg; updateSyncIndicators(); },
+
+  start() {
+    this.stop();
+    if (!this.enabled()) { this.setStatus('off'); return; }
+    this.setStatus('connecting');
+    if (this.cfg().provider === 'firebase') {
+      // Firebase REST streaming (Server-Sent Events) gives instant updates without the SDK
+      try {
+        this.es = new EventSource(this.fbUrl());
+        this.es.addEventListener('put', ev => { try { const m = JSON.parse(ev.data); if (m.path === '/') this.handleRemote(m.data); else this.pull(); } catch (e) { this.pull(); } });
+        this.es.addEventListener('patch', () => this.pull());
+        this.es.addEventListener('cancel', () => this.setStatus('error', 'Permission denied – check your database rules.'));
+        this.es.addEventListener('auth_revoked', () => this.setStatus('error', 'Auth token revoked.'));
+        this.es.onerror = () => { if (this.status !== 'error') this.setStatus('error', 'Cannot reach the database – check the URL and rules. Retrying…'); };
+        this.es.onopen = () => { if (this.status === 'error' || this.status === 'connecting') this.setStatus('live'); };
+      } catch (e) { this.setStatus('error', e.message); }
+    } else {
+      this.pull();
+      this.pollTimer = setInterval(() => this.pull(), 10000);
+    }
+  },
+  stop() {
+    if (this.es) { this.es.close(); this.es = null; }
+    clearInterval(this.pollTimer); this.pollTimer = null;
+    clearTimeout(this.pushTimer);
+  },
+
+  async pull() {
+    if (!this.enabled()) return;
+    try {
+      let rec = null;
+      if (this.cfg().provider === 'firebase') {
+        const r = await fetch(this.fbUrl(), { cache: 'no-store' });
+        if (!r.ok) throw new Error(`Firebase responded ${r.status}`);
+        rec = await r.json();
+      } else {
+        const id = encodeURIComponent(this.cfg().householdId.trim());
+        const r = await fetch(`${this.base()}/rest/v1/household_sync?id=eq.${id}&select=payload,updated_at,updated_by`, { headers: this.sbHeaders(), cache: 'no-store' });
+        if (!r.ok) throw new Error(`Supabase responded ${r.status}`);
+        const rows = await r.json();
+        rec = rows[0] ? { payload: rows[0].payload, updatedAt: Number(rows[0].updated_at), updatedBy: rows[0].updated_by } : null;
+      }
+      this.handleRemote(rec);
+    } catch (e) { this.setStatus('error', e.message); }
+  },
+
+  handleRemote(rec) {
+    if (!rec || !rec.payload) { this.push(); return; }               // empty cloud → upload ours
+    const remoteAt = Number(rec.updatedAt) || 0, localAt = state.meta.updatedAt || 0;
+    if (remoteAt > localAt) {
+      try {
+        const data = JSON.parse(rec.payload);
+        const keep = state.settings;
+        state = normalise({ ...data, settings: keep });
+        state.meta.updatedAt = remoteAt; state.meta.updatedBy = rec.updatedBy;
+        state.settings.sync.lastSync = Date.now();
+        persist();
+        this.setStatus('live');
+        scheduleRender();
+      } catch (e) { this.setStatus('error', 'Cloud data could not be read'); }
+    } else if (remoteAt < localAt) {
+      this.push();                                                     // ours is newer
+    } else {
+      this.setStatus('live');
+    }
+  },
+
+  schedulePush() {
+    if (!this.enabled()) return;
+    this.setStatus('pending');
+    clearTimeout(this.pushTimer);
+    this.pushTimer = setTimeout(() => this.push(), 700);
+  },
+
+  async push() {
+    if (!this.enabled()) return;
+    const payload = JSON.stringify(exportable());
+    const updatedAt = state.meta.updatedAt, updatedBy = state.meta.updatedBy || CLIENT_ID;
+    try {
+      let r;
+      if (this.cfg().provider === 'firebase') {
+        r = await fetch(this.fbUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, updatedAt, updatedBy }) });
+      } else {
+        r = await fetch(`${this.base()}/rest/v1/household_sync`, {
+          method: 'POST',
+          headers: { ...this.sbHeaders(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ id: this.cfg().householdId.trim(), payload, updated_at: updatedAt, updated_by: updatedBy })
+        });
+      }
+      if (!r.ok) throw new Error(`Upload failed (${r.status}) – check URL, key and rules`);
+      state.settings.sync.lastSync = Date.now(); persist();
+      this.setStatus('live');
+    } catch (e) { this.setStatus('error', e.message); }
+  }
+};
+
+function updateSyncIndicators() {
+  const h = $('#sync-indicator-head'), s = $('#sync-indicator-side');
+  if (h) h.innerHTML = syncStatusHTML(true);
+  if (s) s.innerHTML = syncStatusHTML();
+  refreshIcons();
+}
+
+/** Encode sync settings in a link so the second phone can connect in one tap. */
+function syncSetupLink() {
+  const c = state.settings.sync;
+  const json = JSON.stringify({ p: c.provider, u: c.url, k: c.key, h: c.householdId });
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  return location.href.split('#')[0] + '#sync=' + encodeURIComponent(b64);
+}
+function checkSyncLink() {
+  if (!location.hash.startsWith('#sync=')) return false;
+  let cfg;
+  try { cfg = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(location.hash.slice(6)))))); } catch (e) { cfg = null; }
+  history.replaceState(null, '', location.pathname + location.search + '#/settings');
+  if (!cfg || !cfg.u || !cfg.h) { toast('Invalid setup link', 'error'); return false; }
+  setTimeout(() => openModal({
+    title: 'Connect to household sync?',
+    body: `<p class="text-sm text-slate-600">This device will connect to <b>${esc(cfg.p === 'supabase' ? 'Supabase' : 'Firebase')}</b> household <code class="bg-slate-100 px-1 rounded">${esc(cfg.h)}</code>.</p>
+      <p class="text-sm text-slate-600">If the cloud already has data, it will replace the sample data on this device.</p>`,
+    submitLabel: 'Connect',
+    onSubmit: () => {
+      Object.assign(state.settings.sync, { provider: cfg.p || 'firebase', url: cfg.u, key: cfg.k || '', householdId: cfg.h, enabled: true });
+      state.meta.updatedAt = 0; // let the cloud copy win on first connect
+      persist(); Sync.start(); render(); toast('Connecting to household…');
+    }
+  }), 50);
+  return true;
+}
+
+/* ===================== 10. ACTIONS & EVENT DELEGATION ===================== */
+const findPerson = el => byId(state.people, el.dataset.id);
+const findRecipient = el => byId(state.christmas.recipients, el.dataset.id);
+const findList = el => byId(state.checklists, el.dataset.id);
+
+const ACTIONS = {
+  'close-modal': () => closeModal(),
+  'open-backup': () => openBackupModal(),
+  'open-quickadd': () => openQuickAdd(),
+  'select-all': () => $$('#modal-form input[name=pid]').forEach(c => { c.checked = true; }),
+
+  /* Tasks */
+  'quick-task': () => taskForm(),
+  'task-toggle': el => { const t = byId(state.tasks, el.dataset.id); if (!t) return; t.done = !t.done; touch(t); commit(); if (t.done) toast('Nice – task completed ✓'); },
+  'task-edit': el => taskForm(el.dataset.id),
+  'task-delete': el => confirmModal('Delete this task?', () => { state.tasks = state.tasks.filter(x => x.id !== el.dataset.id); commit(); }),
+  'task-filter': el => { ui.taskFilter = el.dataset.val; render(); },
+  'task-cat': el => { ui.taskCat = el.dataset.val; render(); },
+  'tasks-tab': el => { ui.tasksTab = el.dataset.val; if (route() === 'tasks') render(); else location.hash = '#/tasks'; },
+  'tasks-clear-done': () => confirmModal('Remove all completed tasks?', () => { state.tasks = state.tasks.filter(x => !x.done); commit(); }, { yesLabel: 'Clear' }),
+
+  /* Checklists */
+  'cl-new': () => checklistForm(),
+  'cl-edit': el => checklistForm(el.dataset.id),
+  'cl-collapse': el => { ui.clCollapsed[el.dataset.id] = !ui.clCollapsed[el.dataset.id]; render(); },
+  'cl-toggle-item': el => { const c = findList(el); const i = c && byId(c.items, el.dataset.item); if (!i) return; i.done = !i.done; touch(c); commit(); },
+  'cl-del-item': el => { const c = findList(el); if (!c) return; c.items = c.items.filter(i => i.id !== el.dataset.item); touch(c); commit(); },
+  'cl-reset': el => { const c = findList(el); if (!c) return; c.items.forEach(i => { i.done = false; }); touch(c); commit(); toast('Checklist reset'); },
+  'cl-dup': el => { const c = findList(el); if (!c) return; const copy = touch({ id: uid(), title: `${c.title} – ${fmtDate(todayStr(), { day: 'numeric', month: 'short' })}`, reusable: false, items: c.items.map(i => ({ id: uid(), text: i.text, done: false })) }); state.checklists.unshift(copy); commit(); toast('New checklist created from template'); },
+  'cl-delete': el => confirmModal('Delete this checklist and all its items?', () => { state.checklists = state.checklists.filter(x => x.id !== el.dataset.id); commit(); }),
+
+  /* Birthdays */
+  'person-new': () => personForm(),
+  'person-edit': el => personForm(el.dataset.id),
+  'person-toggle': el => { ui.personOpen[el.dataset.id] = !ui.personOpen[el.dataset.id]; render(); },
+  'person-open': (el, e) => { e.preventDefault(); ui.personOpen[el.dataset.id] = true; location.hash = '#/birthdays'; setTimeout(() => { const n = document.getElementById('person-' + el.dataset.id); if (n) n.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); },
+  'person-delete': el => { const p = findPerson(el); if (p) confirmModal(`Delete ${esc(p.name)} and all their gift ideas and history?`, () => { state.people = state.people.filter(x => x.id !== p.id); state.christmas.recipients.forEach(r => { if (r.personId === p.id) r.personId = null; }); commit(); }); },
+  'person-archive': el => { const p = findPerson(el); if (!p || !p.finalGift) return; p.history.push({ id: uid(), year: Number((p.cycleFor || todayStr()).slice(0, 4)), occasion: 'Birthday', gift: p.finalGift.title, price: num(p.finalGift.price), notes: '' }); p.finalGift = null; p.cardBought = false; p.cardSent = false; touch(p); commit(); toast('Archived to gift history'); },
+  'idea-select': el => { const p = findPerson(el); const i = p && byId(p.ideas, el.dataset.item); if (!i) return; p.finalGift = { title: i.title, price: num(i.price), status: p.finalGift?.status || 'idea', ideaId: i.id }; touch(p); commit(); toast('Final gift selected'); },
+  'idea-delete': el => { const p = findPerson(el); if (!p) return; p.ideas = p.ideas.filter(i => i.id !== el.dataset.item); if (p.finalGift && p.finalGift.ideaId === el.dataset.item) p.finalGift.ideaId = null; touch(p); commit(); },
+  'final-custom': el => finalGiftForm(el.dataset.id),
+  'final-clear': el => { const p = findPerson(el); if (!p) return; p.finalGift = null; touch(p); commit(); },
+  'final-status': el => { const p = findPerson(el); if (!p || !p.finalGift) return; p.finalGift.status = el.dataset.val; touch(p); commit(); },
+  'card-bought': el => { const p = findPerson(el); if (!p) return; p.cardBought = !p.cardBought; if (!p.cardBought) p.cardSent = false; touch(p); commit(); },
+  'card-sent': el => { const p = findPerson(el); if (!p) return; p.cardSent = !p.cardSent; if (p.cardSent) p.cardBought = true; touch(p); commit(); },
+  'history-add': el => historyForm(el.dataset.id),
+  'history-delete': el => { const p = findPerson(el); if (!p) return; p.history = p.history.filter(h => h.id !== el.dataset.item); touch(p); commit(); },
+
+  /* Christmas */
+  'xmas-budget': () => budgetForm(),
+  'xmas-import': () => importRecipientsForm(),
+  'xmas-recipient-new': () => recipientForm(),
+  'xmas-recipient-edit': el => recipientForm(el.dataset.id),
+  'xmas-recipient-delete': el => { const r = findRecipient(el); if (r) confirmModal(`Remove ${esc(r.name)} and their ${r.gifts.length} gift(s) from Christmas ${state.christmas.year}?`, () => { state.christmas.recipients = state.christmas.recipients.filter(x => x.id !== r.id); commit(); }, { yesLabel: 'Remove' }); },
+  'xmas-gift-new': el => xmasGiftForm(el.dataset.id || null),
+  'xmas-gift-edit': el => xmasGiftForm(el.dataset.id, el.dataset.item),
+  'xmas-gift-delete': el => { const r = findRecipient(el); if (!r) return; r.gifts = r.gifts.filter(g => g.id !== el.dataset.item); touch(r); commit(); },
+  'xmas-filter': el => { ui.xmasFilter = el.dataset.val; render(); },
+  'xmas-new-year': () => {
+    const c = state.christmas;
+    confirmModal(`This archives Christmas ${c.year}: purchased gifts are copied into each linked person's gift history, gifts are cleared, and your recipient list and budgets are kept for ${c.year + 1}.`, () => {
+      const xs = xmasStats();
+      c.archive.push({ year: c.year, budget: c.budget, spent: xs.spent, recipients: clone(c.recipients) });
+      c.recipients.forEach(r => {
+        const p = r.personId ? byId(state.people, r.personId) : null;
+        if (p) { r.gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX).forEach(g => p.history.push({ id: uid(), year: c.year, occasion: 'Christmas', gift: g.title, price: num(g.price), notes: '' })); touch(p); }
+        r.gifts = []; touch(r);
+      });
+      c.year += 1; commit(); toast(`Ready for Christmas ${c.year} 🎄`);
+    }, { title: `Start Christmas ${c.year + 1}?`, yesLabel: 'Archive & start', danger: false });
+  },
+
+  /* Vault */
+  'vault-new': () => vaultForm(),
+  'vault-edit': el => vaultForm(el.dataset.id),
+  'vault-delete': el => confirmModal('Delete this vault entry?', () => { state.vault = state.vault.filter(x => x.id !== el.dataset.id); commit(); }),
+  'vault-cat': el => { ui.vaultCat = el.dataset.val; render(); },
+  'copy': el => { const v = el.dataset.val; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast('Copied to clipboard')).catch(() => toast('Copy not available – select the text manually', 'error')); },
+
+  /* Backup & data */
+  'export-json': () => exportJSON(),
+  'share-json': () => shareJSON(),
+  'import-json': () => { const f = $('#import-file'); f.value = ''; f.click(); },
+  'import-replace': () => applyImport('replace'),
+  'import-merge': () => applyImport('merge'),
+  'clear-sample': () => confirmModal('Remove all sample entries? Anything you have added yourself is kept.', () => {
+    const real = x => !x.sample;
+    const sampleIds = new Set(state.people.filter(x => x.sample).map(x => x.id));
+    state.tasks = state.tasks.filter(real); state.checklists = state.checklists.filter(real); state.people = state.people.filter(real); state.vault = state.vault.filter(real);
+    state.christmas.recipients = state.christmas.recipients.filter(r => real(r) && !sampleIds.has(r.personId));
+    if (state.christmas.sampleBudget) { state.christmas.budget = 0; delete state.christmas.sampleBudget; }
+    commit(); toast('Sample data cleared');
+  }, { yesLabel: 'Clear sample data' }),
+  'load-sample': () => confirmModal('Add the sample entries back alongside your own data?', () => {
+    const s = sampleState();
+    const strip = arr => arr.filter(x => !x.sample);
+    state.tasks = [...strip(state.tasks), ...s.tasks]; state.checklists = [...strip(state.checklists), ...s.checklists];
+    state.people = [...strip(state.people), ...s.people]; state.vault = [...strip(state.vault), ...s.vault];
+    state.christmas.recipients = [...strip(state.christmas.recipients), ...s.christmas.recipients];
+    if (!state.christmas.budget) { state.christmas.budget = s.christmas.budget; state.christmas.sampleBudget = true; }
+    commit(); toast('Sample data loaded');
+  }, { yesLabel: 'Load samples', danger: false }),
+  'reset-all': () => confirmModal('Erase ALL data on this device? Export a backup first if unsure. If live sync is on, the empty data will also sync to your partner.', () => {
+    const keep = state.settings; state = defaultState(); state.settings = keep; commit(); toast('All data erased');
+  }, { yesLabel: 'Erase everything' }),
+
+  /* Sync */
+  'sync-genid': () => { const i = $('input[name=householdId]'); if (i) i.value = 'home-' + Array.from(crypto.getRandomValues(new Uint8Array(10)), b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); },
+  'sync-now': () => { if (!Sync.enabled()) { toast('Live sync is not enabled', 'error'); return; } Sync.setStatus('connecting'); Sync.pull(); },
+  'sync-copy-link': () => { const l = syncSetupLink(); (navigator.clipboard ? navigator.clipboard.writeText(l) : Promise.reject()).then(() => toast('Setup link copied – send it to the other phone')).catch(() => prompt('Copy this link:', l)); }
+};
+
+const FORMS = {
+  'task-quick': (fd, form) => {
+    const title = String(fd.get('title') || '').trim(); if (!title) return;
+    state.tasks.push(touch({ id: uid(), title, due: fd.get('due') || '', priority: fd.get('priority') || 'medium', category: fd.get('category') || 'general', notes: '', done: false }));
+    focusAfterRender = '[data-form="task-quick"] input[name=title]';
+    commit(); toast('Task added');
+  },
+  'cl-add-item': (fd, form) => {
+    const c = byId(state.checklists, form.dataset.id); const text = String(fd.get('text') || '').trim();
+    if (!c || !text) return;
+    c.items.push({ id: uid(), text, done: false }); touch(c);
+    focusAfterRender = `[data-focus-key="cl-${c.id}"]`;
+    commit();
+  },
+  'idea-add': (fd, form) => {
+    const p = byId(state.people, form.dataset.id); const title = String(fd.get('title') || '').trim();
+    if (!p || !title) return;
+    p.ideas.push({ id: uid(), title, price: num(fd.get('price')), link: String(fd.get('link') || '').trim() }); touch(p);
+    focusAfterRender = `[data-focus-key="idea-${p.id}"]`;
+    commit();
+  },
+  'sync-settings': fd => {
+    const sc = state.settings.sync;
+    Object.assign(sc, { provider: fd.get('provider') || 'firebase', url: String(fd.get('url') || '').trim(), key: String(fd.get('key') || '').trim(), householdId: String(fd.get('householdId') || '').trim(), enabled: fd.get('enabled') === 'on' });
+    if (sc.enabled && (!sc.url || !sc.householdId)) { toast('Enter a URL and Household ID first', 'error'); sc.enabled = false; }
+    if (sc.enabled && sc.provider === 'supabase' && !sc.key) { toast('Supabase needs the anon key', 'error'); sc.enabled = false; }
+    persist(); Sync.start(); render();
+    toast(sc.enabled ? 'Sync settings saved – connecting…' : 'Sync settings saved (sync off)');
+  }
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el || el.disabled) return;
+  const fn = ACTIONS[el.dataset.action];
+  if (!fn) return;
+  if (el.tagName === 'A' && el.dataset.action !== 'close-modal') e.preventDefault();
+  fn(el, e);
+});
+
+document.addEventListener('submit', e => {
+  const form = e.target;
+  if (form.id === 'modal-form') {
+    e.preventDefault();
+    if (!modalHandler) return;
+    const seq = modalSeq, handler = modalHandler;
+    const result = handler(new FormData(form), form);
+    if (result !== false && seq === modalSeq) closeModal();   // don't close a modal opened by the handler
+    return;
+  }
+  const key = form.dataset.form;
+  if (key && FORMS[key]) { e.preventDefault(); FORMS[key](new FormData(form), form); }
+});
+
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.id === 'import-file' && el.files && el.files[0]) { closeModal(); handleImportFile(el.files[0]); return; }
+  if (el.dataset.change === 'xmas-gift-status') {
+    const r = byId(state.christmas.recipients, el.dataset.id); const g = r && byId(r.gifts, el.dataset.item);
+    if (!g) return; g.status = el.value; touch(r); commit();
+  }
+});
+
+document.addEventListener('input', e => {
+  if (e.target.dataset.input === 'vault-search') {
+    ui.vaultSearch = e.target.value;
+    $('#vault-list').innerHTML = vaultListHTML(); refreshIcons();
+  }
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal-root').innerHTML) closeModal(); });
+
+/* ============================ 11. ROUTER & BOOT ============================ */
+let focusAfterRender = null, renderDeferred = false;
+const route = () => { const r = (location.hash.match(/^#\/(\w+)/) || [])[1]; return TITLES[r] ? r : 'dashboard'; };
+
+function renderNav(r) {
+  $('#side-nav').innerHTML = NAV.map(n => `
+    <a href="#/${n.id}" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${r === n.id ? 'bg-teal-50 text-teal-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}">
+      ${icon(n.icon, 'w-5 h-5 ' + (r === n.id ? 'text-teal-600' : 'text-slate-400'))}${n.label}</a>`).join('');
+  $('#bottom-nav-inner').innerHTML = NAV.filter(n => !n.desktopOnly).map(n => `
+    <a href="#/${n.id}" class="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium ${r === n.id ? 'text-teal-700' : 'text-slate-500'}">
+      <span class="w-12 h-7 rounded-full flex items-center justify-center ${r === n.id ? 'bg-teal-50' : ''}">${icon(n.icon, 'w-5 h-5')}</span>${n.label}</a>`).join('');
+}
+
+const VIEWS = { dashboard: renderDashboard, tasks: renderTasks, birthdays: renderBirthdays, christmas: renderChristmas, vault: renderVault, settings: renderSettings };
+
+function render() {
+  renderDeferred = false;
+  const r = route();
+  $('#page-title').textContent = TITLES[r];
+  document.title = `${TITLES[r]} · Home Hub`;
+  renderNav(r);
+  try { $('#view').innerHTML = `<div class="anim-fade">${VIEWS[r]()}</div>`; }
+  catch (err) { console.error(err); $('#view').innerHTML = `<div class="${CARD} p-6 text-rose-700">Something went wrong displaying this page: ${esc(err.message)}. Try Settings → Export, then reload.</div>`; }
+  updateSyncIndicators();
+  refreshIcons();
+  if (focusAfterRender) { const f = $(focusAfterRender); if (f) f.focus({ preventScroll: true }); focusAfterRender = null; }
+}
+
+/** For remote sync updates: don't wipe something the user is typing – wait until they leave the field. */
+function scheduleRender() {
+  const a = document.activeElement;
+  if (a && $('#view').contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) { renderDeferred = true; return; }
+  render();
+}
+document.addEventListener('focusout', () => { if (renderDeferred) setTimeout(() => { if (renderDeferred) scheduleRender(); }, 50); });
+
+window.addEventListener('hashchange', () => { if (checkSyncLink()) return; render(); window.scrollTo({ top: 0 }); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { ensureCycles(); if (Sync.enabled()) Sync.pull(); render(); }
+});
+window.addEventListener('storage', e => { if (e.key === STORE_KEY && e.newValue) { state = normalise(JSON.parse(e.newValue)); scheduleRender(); } }); // other tabs
+
+// Boot
+state = load();
+ensureCycles();
+checkSyncLink();
+render();
+Sync.start();
+</script>
+</body>
+</html>
