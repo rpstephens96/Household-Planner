@@ -158,8 +158,9 @@
      3. State: defaults, sample data, load / save / normalise
      4. Domain helpers (birthdays, Christmas stats, renewals)
      5. UI primitives (icons, pills, inputs, modal, toast)
-     6. Views: Dashboard, Tasks, Birthdays, Christmas, Vault, Settings
+     6. Views: Dashboard, Tasks, Birthdays, Christmas, Vault, Settings, Other tools, Finance planner
      7. Forms (modals)
+     7b. Bank CSV regular-payment finder (in-memory only)
      8. Backup: export / import / share
      9. Cloud sync (Firebase Realtime DB, modular SDK v10 – signed-in users only)
     10. Actions & event delegation
@@ -186,7 +187,7 @@ const NAV = [
   { id: 'vault',     label: 'Vault',     icon: 'shield-check' },
   { id: 'settings',  label: 'Settings',  icon: 'settings', desktopOnly: true }
 ];
-const TITLES = { dashboard: 'Home', tasks: 'Tasks & Checklists', birthdays: 'Birthdays', christmas: 'Christmas Planner', vault: 'Household Vault', settings: 'Settings' };
+const TITLES = { dashboard: 'Home', tasks: 'Tasks & Checklists', birthdays: 'Birthdays', christmas: 'Christmas Planner', vault: 'Household Vault', settings: 'Settings', tools: 'Other tools', finance: 'Finance planner' };
 
 const PRIORITIES = {
   high:   { label: 'High',   cls: 'bg-rose-50 text-rose-700 ring-rose-200',    rank: 0 },
@@ -211,16 +212,81 @@ const XMAS_STATUS = [
 const XMAS_IDX = Object.fromEntries(XMAS_STATUS.map((s, i) => [s.id, i]));
 const XMAS_BOUGHT_IDX = XMAS_IDX.purchased; // purchased or beyond counts as "spent"
 
-const VAULT_CATS = [
-  { id: 'mortgage',    label: 'Mortgages',               icon: 'landmark',    bg: 'bg-indigo-50',  fg: 'text-indigo-600' },
-  { id: 'home',        label: 'Home Insurance',          icon: 'house',       bg: 'bg-teal-50',    fg: 'text-teal-600' },
-  { id: 'car',         label: 'Car Insurance',           icon: 'car',         bg: 'bg-sky-50',     fg: 'text-sky-600' },
-  { id: 'life',        label: 'Life / Health Insurance', icon: 'heart-pulse', bg: 'bg-rose-50',    fg: 'text-rose-600' },
-  { id: 'utilities',   label: 'Utilities / Broadband',   icon: 'wifi',        bg: 'bg-amber-50',   fg: 'text-amber-600' },
-  { id: 'investments', label: 'Investments / Savings',   icon: 'piggy-bank',  bg: 'bg-emerald-50', fg: 'text-emerald-600' },
-  { id: 'other',       label: 'Other',                   icon: 'folder',      bg: 'bg-slate-100',  fg: 'text-slate-600' }
+/* ---- Category colours & icons (full Tailwind class names so the CDN generates them) ---- */
+const COLOURS = {
+  teal:    { bg: 'bg-teal-50',    fg: 'text-teal-600',    dot: 'bg-teal-500' },
+  emerald: { bg: 'bg-emerald-50', fg: 'text-emerald-600', dot: 'bg-emerald-500' },
+  sky:     { bg: 'bg-sky-50',     fg: 'text-sky-600',     dot: 'bg-sky-500' },
+  indigo:  { bg: 'bg-indigo-50',  fg: 'text-indigo-600',  dot: 'bg-indigo-500' },
+  violet:  { bg: 'bg-violet-50',  fg: 'text-violet-600',  dot: 'bg-violet-500' },
+  fuchsia: { bg: 'bg-fuchsia-50', fg: 'text-fuchsia-600', dot: 'bg-fuchsia-500' },
+  rose:    { bg: 'bg-rose-50',    fg: 'text-rose-600',    dot: 'bg-rose-500' },
+  orange:  { bg: 'bg-orange-50',  fg: 'text-orange-600',  dot: 'bg-orange-500' },
+  amber:   { bg: 'bg-amber-50',   fg: 'text-amber-600',   dot: 'bg-amber-500' },
+  lime:    { bg: 'bg-lime-50',    fg: 'text-lime-700',    dot: 'bg-lime-500' },
+  cyan:    { bg: 'bg-cyan-50',    fg: 'text-cyan-600',    dot: 'bg-cyan-500' },
+  slate:   { bg: 'bg-slate-100',  fg: 'text-slate-600',   dot: 'bg-slate-500' }
+};
+const CAT_ICONS = ['landmark', 'house', 'car', 'heart-pulse', 'wifi', 'piggy-bank', 'folder', 'zap', 'flame', 'droplets', 'phone', 'tv',
+  'shield', 'briefcase', 'graduation-cap', 'plane', 'dog', 'baby', 'stethoscope', 'receipt', 'credit-card', 'wallet', 'file-text', 'key-round',
+  'building-2', 'bike', 'gem', 'umbrella', 'wrench', 'sprout', 'laptop', 'gift'];
+
+/* ---- Household Vault categories: these are only the starting set – users can edit them (state.vaultCats) ---- */
+const DEFAULT_VAULT_CATS = [
+  { id: 'mortgage',    label: 'Mortgages',               icon: 'landmark',    colour: 'indigo' },
+  { id: 'home',        label: 'Home Insurance',          icon: 'house',       colour: 'teal' },
+  { id: 'car',         label: 'Car Insurance',           icon: 'car',         colour: 'sky' },
+  { id: 'life',        label: 'Life / Health Insurance', icon: 'heart-pulse', colour: 'rose' },
+  { id: 'utilities',   label: 'Utilities / Broadband',   icon: 'wifi',        colour: 'amber' },
+  { id: 'investments', label: 'Investments / Savings',   icon: 'piggy-bank',  colour: 'emerald' },
+  { id: 'other',       label: 'Other',                   icon: 'folder',      colour: 'slate' }   // 'other' is permanent (fallback)
 ];
-const VAULT_CAT = Object.fromEntries(VAULT_CATS.map(c => [c.id, c]));
+function vcats() { return (state && Array.isArray(state.vaultCats) && state.vaultCats.length) ? state.vaultCats : DEFAULT_VAULT_CATS; }
+/** Category lookup with colour classes; unknown/deleted ids fall back to "Other". */
+function vcat(id) {
+  const L = vcats();
+  const c = L.find(x => x.id === id) || L.find(x => x.id === 'other') || DEFAULT_VAULT_CATS[DEFAULT_VAULT_CATS.length - 1];
+  return { ...c, ...(COLOURS[c.colour] || COLOURS.slate) };
+}
+
+/* ---- Finance planner ---- */
+const FIN_FREQ  = { monthly: 'Monthly', yearly: 'Yearly' };
+const FIN_TYPES = { essential: 'Essential', discretionary: 'Discretionary' };
+function defaultFinance() {
+  return {
+    incomeCats: [
+      { id: 'salary', label: 'Salary' },
+      { id: 'bonus', label: 'Bonus / overtime' },
+      { id: 'benefits', label: 'Benefits' },
+      { id: 'inc_other', label: 'Other income' }            // permanent fallback
+    ],
+    outCats: [
+      { id: 'housing', label: 'Housing', essential: true },
+      { id: 'utilities', label: 'Utilities & broadband', essential: true },
+      { id: 'insurance', label: 'Insurance', essential: true },
+      { id: 'transport', label: 'Transport', essential: true },
+      { id: 'food', label: 'Food & groceries', essential: true },
+      { id: 'childcare', label: 'Childcare', essential: true },
+      { id: 'debt', label: 'Debt & credit', essential: true },
+      { id: 'subscriptions', label: 'Subscriptions', essential: false },
+      { id: 'leisure', label: 'Leisure & eating out', essential: false },
+      { id: 'gifts', label: 'Gifts & occasions', essential: false },
+      { id: 'out_other', label: 'Other', essential: false }   // permanent fallback
+    ],
+    incomes: [],     // { id, name, amount, frequency: monthly|yearly, categoryId, notes }
+    outgoings: [],   // { id, name, amount, frequency, categoryId, type: essential|discretionary, dueDate, notes }
+    pots: [],        // { id, name, mode: fixed|percent, value, target, balance, targetDate, notes }
+    billsPot: { name: 'Annual bills pot (Monzo)', balance: 0 },
+    csvProfiles: {}  // remembered column mappings per CSV layout (no transaction data)
+  };
+}
+
+/* ---- Other tools registry – add future tools here (and to TITLES / VIEWS) ---- */
+const TOOLS = [
+  { route: 'finance', title: 'Finance planner', icon: 'wallet', tone: 'bg-emerald-50 text-emerald-600',
+    desc: 'Joint take-home budget, regular outgoings, annual bills pot and savings allocation – with a bank CSV regular-payment finder.',
+    status: () => { const s = finStats(); return s.income ? `Left to spend: ${money(s.left)} a month` : 'Not set up yet'; } }
+];
 
 /* ========================= 2. UTILITY HELPERS ======================== */
 const $  = (s, r = document) => r.querySelector(s);
@@ -269,6 +335,8 @@ function defaultState() {
     people: [],
     christmas: { year: new Date().getFullYear(), budget: 0, recipients: [], archive: [] },
     vault: [],
+    vaultCats: clone(DEFAULT_VAULT_CATS),
+    finance: defaultFinance(),
     settings: { sync: { enabled: false, householdId: '', lastSync: null } },
     meta: { updatedAt: Date.now(), updatedBy: CLIENT_ID }
   };
@@ -353,7 +421,8 @@ let state;
 let ui = {
   taskFilter: 'open', taskCat: 'all', tasksTab: 'tasks',
   clCollapsed: {}, personOpen: {},
-  xmasFilter: 'all', vaultCat: 'all', vaultSearch: ''
+  xmasFilter: 'all', vaultCat: 'all', vaultSearch: '',
+  finTab: 'overview', finOutFilter: 'all'
 };
 
 /** Fill in any missing keys so older/imported data never crashes the UI. */
@@ -367,6 +436,16 @@ function normalise(raw) {
   s.christmas = Object.assign({ year: new Date().getFullYear(), budget: 0, recipients: [], archive: [] }, s.christmas || {});
   s.christmas.recipients = (s.christmas.recipients || []).map(r => ({ gifts: [], ...r, gifts: Array.isArray(r.gifts) ? r.gifts : [] }));
   s.vault = Array.isArray(s.vault) ? s.vault : [];
+  s.vaultCats = (Array.isArray(s.vaultCats) && s.vaultCats.length ? s.vaultCats : clone(DEFAULT_VAULT_CATS)).filter(c => c && c.id && c.label);
+  if (!s.vaultCats.some(c => c.id === 'other')) s.vaultCats.push({ id: 'other', label: 'Other', icon: 'folder', colour: 'slate' });
+  const fdef = defaultFinance(), f = Object.assign(defaultFinance(), s.finance || {});
+  ['incomes', 'outgoings', 'pots'].forEach(k => { f[k] = Array.isArray(f[k]) ? f[k] : []; });
+  ['incomeCats', 'outCats'].forEach(k => { f[k] = Array.isArray(f[k]) && f[k].length ? f[k] : fdef[k]; });
+  if (!f.incomeCats.some(c => c.id === 'inc_other')) f.incomeCats.push({ id: 'inc_other', label: 'Other income' });
+  if (!f.outCats.some(c => c.id === 'out_other')) f.outCats.push({ id: 'out_other', label: 'Other', essential: false });
+  f.billsPot = Object.assign({ name: 'Annual bills pot (Monzo)', balance: 0 }, f.billsPot || {});
+  f.csvProfiles = f.csvProfiles && typeof f.csvProfiles === 'object' ? f.csvProfiles : {};
+  s.finance = f;
   s.settings = Object.assign(defaultState().settings, s.settings || {});
   const oldSync = s.settings.sync || {};
   s.settings.sync = { enabled: !!oldSync.enabled, householdId: String(oldSync.householdId || ''), lastSync: oldSync.lastSync || null };
@@ -458,6 +537,74 @@ function xmasStats() {
     giftsTotal: gifts.length, giftsBought: gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX).length,
     days: daysUntil(`${c.year}-12-25`)
   };
+}
+
+
+/* ---------- Finance calculations ---------- */
+const fin = () => state.finance;
+const monthlyOf = x => x.frequency === 'yearly' ? num(x.amount) / 12 : num(x.amount);
+function finCat(kind, id) {
+  const L = kind === 'income' ? fin().incomeCats : fin().outCats;
+  const fb = kind === 'income' ? 'inc_other' : 'out_other';
+  return L.find(c => c.id === id) || L.find(c => c.id === fb) || { id: fb, label: 'Other' };
+}
+const VAULT_TO_FIN = { mortgage: 'housing', home: 'insurance', car: 'insurance', life: 'insurance', utilities: 'utilities' };
+function vaultFinCat(v) {
+  const c = v.finCat || VAULT_TO_FIN[v.category] || 'out_other';
+  return fin().outCats.some(x => x.id === c) ? c : 'out_other';
+}
+/** Manual outgoings plus vault entries ticked "Include in budget" (the vault stays the single source of truth for those). */
+function finOutgoings() {
+  const manual = fin().outgoings.map(o => ({ ...o, src: 'manual' }));
+  const vault = state.vault.filter(v => v.inBudget && num(v.cost) > 0).map(v => ({
+    id: 'v_' + v.id, vaultId: v.id, src: 'vault',
+    name: v.provider + (v.name ? ' – ' + v.name : ''),
+    amount: num(v.cost), frequency: v.costPeriod === 'annual' ? 'yearly' : 'monthly',
+    categoryId: vaultFinCat(v), type: v.finType === 'discretionary' ? 'discretionary' : 'essential',
+    dueDate: v.renewalDate || '', notes: ''
+  }));
+  return [...manual, ...vault];
+}
+/** Next anniversary of a date (today counts). Future dates are returned unchanged. */
+function nextAnnual(s) {
+  if (!s) return null;
+  const t = todayStr();
+  if (s >= t) return s;
+  const y = new Date().getFullYear();
+  let d = bdayInYear(s, y);
+  if (d < t) d = bdayInYear(s, y + 1);
+  return d;
+}
+/** Income → monthly outgoings → annual bills pot (yearly ÷ 12) → savings → left to spend. */
+function finStats() {
+  const F = fin(), outs = finOutgoings();
+  const income = sum(F.incomes, monthlyOf);
+  const monthlyItems = outs.filter(o => o.frequency !== 'yearly');
+  const yearlyItems = outs.filter(o => o.frequency === 'yearly');
+  const monthlyOut = sum(monthlyItems, o => num(o.amount));
+  const yearlyTotal = sum(yearlyItems, o => num(o.amount));
+  const billsPot = yearlyTotal / 12;
+  const essential = sum(outs.filter(o => o.type !== 'discretionary'), monthlyOf);
+  const discretionary = sum(outs.filter(o => o.type === 'discretionary'), monthlyOf);
+  const available = income - monthlyOut - billsPot;
+  const potAlloc = F.pots.map(p => ({ p, monthly: p.mode === 'percent' ? Math.max(0, available) * num(p.value) / 100 : num(p.value) }));
+  const savings = sum(potAlloc, x => x.monthly);
+  const byCat = {};
+  outs.forEach(o => { const c = finCat('out', o.categoryId).id; byCat[c] = (byCat[c] || 0) + monthlyOf(o); });
+  return { income, outs, monthlyItems, yearlyItems, monthlyOut, yearlyTotal, billsPot, essential, discretionary, available, potAlloc, savings, left: available - savings, byCat };
+}
+/** What the annual bills pot should hold today: each yearly bill needs (12 − months until due) / 12 of its cost saved. */
+function billsPotStatus() {
+  const items = finOutgoings().filter(o => o.frequency === 'yearly').map(o => {
+    const due = nextAnnual(o.dueDate);
+    if (!due) return { o, due: null, expected: null };
+    const days = daysUntil(due);
+    const monthsLeft = Math.min(12, Math.max(0, Math.ceil(days / 30.44)));
+    return { o, due, days, monthsLeft, expected: num(o.amount) * (12 - monthsLeft) / 12 };
+  }).sort((a, b) => (a.due || '9999') < (b.due || '9999') ? -1 : 1);
+  const expected = sum(items.filter(i => i.due), i => i.expected);
+  const balance = num(fin().billsPot.balance);
+  return { items, expected, balance, diff: balance - expected, undated: items.filter(i => !i.due).length };
 }
 
 function sortTasks(a, b) {
@@ -681,7 +828,7 @@ function renderDashboard() {
         <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('shield-check', 'w-5 h-5 text-amber-600')} Renewals due (60 days)</h3>
         <a href="#/vault" class="text-sm text-teal-700 hover:underline">Open vault</a>
       </div>
-      ${renewals.length ? `<ul class="space-y-2">${renewals.map(({ v }) => { const c = VAULT_CAT[v.category] || VAULT_CAT.other; return `
+      ${renewals.length ? `<ul class="space-y-2">${renewals.map(({ v }) => { const c = vcat(v.category); return `
         <li class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
           <div class="w-9 h-9 rounded-lg ${c.bg} ${c.fg} flex items-center justify-center shrink-0">${icon(c.icon)}</div>
           <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 truncate">${esc(v.provider)} <span class="font-normal text-slate-500">· ${esc(v.name || c.label)}</span></p>
@@ -1036,14 +1183,14 @@ function vaultMatches(v) {
   const q = ui.vaultSearch.trim().toLowerCase();
   if (ui.vaultCat !== 'all' && v.category !== ui.vaultCat) return false;
   if (!q) return true;
-  return [v.provider, v.name, v.accountNo, v.location, v.notes, (VAULT_CAT[v.category] || {}).label].some(x => String(x || '').toLowerCase().includes(q));
+  return [v.provider, v.name, v.accountNo, v.location, v.notes, vcat(v.category).label].some(x => String(x || '').toLowerCase().includes(q));
 }
 function vaultListHTML() {
   const items = state.vault.filter(vaultMatches).sort((a, b) => (a.renewalDate || '9999') < (b.renewalDate || '9999') ? -1 : 1);
   if (!items.length) return `<div class="${CARD}">${emptyBox('search', state.vault.length ? 'No matches' : 'Your vault is empty', state.vault.length ? 'Try a different search or category.' : 'Add mortgages, insurance, utilities and savings so you both know where everything lives.', state.vault.length ? '' : `<button type="button" data-action="vault-new" class="${BTN_SOFT}">${icon('plus')}Add first entry</button>`)}</div>`;
-  const cats = ui.vaultCat === 'all' ? VAULT_CATS : [VAULT_CAT[ui.vaultCat]];
+  const cats = ui.vaultCat === 'all' ? vcats().map(c => vcat(c.id)) : [vcat(ui.vaultCat)];
   return cats.map(c => {
-    const group = items.filter(v => (VAULT_CAT[v.category] ? v.category : 'other') === c.id);
+    const group = items.filter(v => vcat(v.category).id === c.id);
     if (!group.length) return '';
     return `<section class="mb-6">
       <h3 class="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-3"><span class="w-7 h-7 rounded-lg ${c.bg} ${c.fg} flex items-center justify-center">${icon(c.icon, 'w-4 h-4')}</span>${c.label}<span class="text-slate-400 font-normal">${group.length}</span></h3>
@@ -1052,7 +1199,7 @@ function vaultListHTML() {
   }).join('');
 }
 function vaultCard(v) {
-  const c = VAULT_CAT[v.category] || VAULT_CAT.other;
+  const c = vcat(v.category);
   const cost = num(v.cost), monthly = v.costPeriod === 'monthly';
   const url = safeUrl(v.url);
   return `<article class="${CARD} p-4 flex flex-col gap-3">
@@ -1074,6 +1221,7 @@ function vaultCard(v) {
       : `<button type="button" data-action="vault-edit" data-id="${v.id}" class="rounded-xl bg-amber-50 ring-1 ring-amber-100 p-3 text-left text-sm text-amber-800 flex gap-2">${icon('map-pin', 'w-4 h-4 mt-0.5')}Add where the documents are kept</button>`}
     ${v.notes ? `<p class="text-sm text-slate-600 whitespace-pre-line bg-slate-50 rounded-xl p-3 break-words">${esc(v.notes)}</p>` : ''}
     <div class="flex items-center gap-2 pt-1 mt-auto">
+      ${v.inBudget ? pill(`${icon('wallet', 'w-3 h-3')} In budget`, 'bg-emerald-50 text-emerald-700 ring-emerald-200') : ''}
       ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="${BTN_SOFT} !py-1.5 !text-xs">${icon('external-link', 'w-3.5 h-3.5')}Login / portal</a>` : ''}
       <button type="button" data-action="vault-edit" data-id="${v.id}" class="${ICON_BTN} ml-auto" aria-label="Edit">${icon('pencil')}</button>
       <button type="button" data-action="vault-delete" data-id="${v.id}" class="${ICON_BTN} -mr-2 hover:!text-rose-600" aria-label="Delete">${icon('trash-2')}</button>
@@ -1095,9 +1243,10 @@ function renderVault() {
   <div class="flex flex-col sm:flex-row gap-2 mb-3">
     <div class="relative flex-1"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">${icon('search')}</span>
       <input data-input="vault-search" value="${esc(ui.vaultSearch)}" placeholder="Search provider, policy number, location…" class="${INPUT} pl-9"></div>
-    <button type="button" data-action="vault-new" class="${BTN_PRIMARY}">${icon('plus')}Add entry</button>
+    <div class="flex gap-2"><button type="button" data-action="vault-cats" class="${BTN_GHOST} flex-1 sm:flex-none">${icon('tags')}Categories</button>
+    <button type="button" data-action="vault-new" class="${BTN_PRIMARY} flex-1 sm:flex-none">${icon('plus')}Add entry</button></div>
   </div>
-  <div class="mb-5">${filterPills([['all', 'All', V.length], ...VAULT_CATS.map(c => [c.id, c.label, V.filter(v => v.category === c.id).length])], ui.vaultCat, 'vault-cat')}</div>
+  <div class="mb-5">${filterPills([['all', 'All', V.length], ...vcats().map(c => [c.id, c.label, V.filter(v => vcat(v.category).id === c.id).length])], ui.vaultCat, 'vault-cat')}</div>
   <div id="vault-list">${vaultListHTML()}</div>`;
 }
 
@@ -1128,6 +1277,12 @@ function renderSettings() {
         <button type="button" data-action="sign-out" class="${BTN_GHOST}">${icon('log-out')}Sign out</button>
       </div>
       <p class="text-xs text-slate-500 mt-3">${icon('lock', 'w-3.5 h-3.5 inline -mt-0.5')} Access is restricted to ${ALLOWED_EMAILS.length} approved Google accounts by the database Security Rules.</p>
+    </section>
+
+    <section class="${CARD} p-5">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-1">${icon('layout-grid', 'w-5 h-5 text-violet-600')} Other tools</h3>
+      <p class="text-sm text-slate-500 mb-4">Occasional tools kept out of the main menu – currently the ${TOOLS.map(t => t.title.toLowerCase()).join(', ')}.</p>
+      <a href="#/tools" class="${BTN_SOFT}">${icon('arrow-right')}Open other tools</a>
     </section>
 
     <section class="${CARD} p-5 lg:row-span-2">
@@ -1170,6 +1325,331 @@ function renderSettings() {
       </div>
     </section>
   </div>`;
+}
+
+/* ---------- 6.7 OTHER TOOLS ---------- */
+function renderTools() {
+  return `
+  <a href="#/settings" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3">${icon('arrow-left')}Settings</a>
+  <p class="text-sm text-slate-500 mb-4">Occasional tools, kept out of the main menu.</p>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    ${TOOLS.map(t => `<a href="#/${t.route}" class="${CARD} p-5 hover:border-teal-300 transition flex flex-col gap-3">
+      <div class="flex items-center gap-3"><span class="w-11 h-11 rounded-xl ${t.tone} flex items-center justify-center shrink-0">${icon(t.icon, 'w-5 h-5')}</span><h3 class="font-semibold text-slate-900">${t.title}</h3></div>
+      <p class="text-sm text-slate-500">${t.desc}</p>
+      <p class="text-xs font-medium text-teal-700 mt-auto">${esc(t.status())}</p></a>`).join('')}
+    <div class="rounded-2xl border-2 border-dashed border-slate-200 p-5 flex items-center justify-center text-sm text-slate-400 min-h-[8rem]">More tools coming</div>
+  </div>`;
+}
+
+/* ---------- 6.8 FINANCE PLANNER ---------- */
+/** Like field(), but a <div> wrapper – for groups of radios (nested <label>s are invalid HTML). */
+const fieldDiv = (label, input, hint = '') => `<div><span class="block text-sm font-medium text-slate-700 mb-1.5">${label}</span>${input}${hint ? `<span class="block text-xs text-slate-500 mt-1">${hint}</span>` : ''}</div>`;
+const seg = (name, opts, val) => `<div class="flex rounded-xl bg-slate-100 p-1">${opts.map(([k, l]) => `<label class="flex-1 cursor-pointer"><input type="radio" name="${name}" value="${k}" class="peer sr-only" ${val === k ? 'checked' : ''}><span class="block text-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-slate-900">${l}</span></label>`).join('')}</div>`;
+const perLabel = o => o.frequency === 'yearly' ? 'yr' : 'mo';
+
+function renderFinance() {
+  const st = finStats();
+  const tabs = [['overview', 'Overview', 'layout-dashboard'], ['income', 'Income', 'arrow-down-left'], ['outgoings', 'Outgoings', 'arrow-up-right'], ['savings', 'Savings', 'piggy-bank'], ['import', 'Find from bank CSV', 'file-search']];
+  const body = { overview: finOverview, income: finIncomeTab, outgoings: finOutTab, savings: finSavingsTab, import: finImportTab }[ui.finTab] || finOverview;
+  return `
+  <a href="#/tools" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3">${icon('arrow-left')}Other tools</a>
+  <div class="flex gap-1 overflow-x-auto no-scrollbar rounded-xl bg-slate-100 p-1 mb-5">
+    ${tabs.map(([v, l, i]) => `<button type="button" data-action="fin-tab" data-val="${v}" class="shrink-0 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${ui.finTab === v ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}">${icon(i)}${l}</button>`).join('')}
+  </div>
+  ${body(st)}`;
+}
+
+function finRow(o, kind) {
+  const yearly = o.frequency === 'yearly';
+  return `<li class="flex items-center gap-3 py-3">
+    <div class="flex-1 min-w-0">
+      <p class="text-sm font-medium text-slate-800 break-words">${esc(o.name)}</p>
+      <div class="flex flex-wrap items-center gap-1.5 mt-1">
+        ${pill(FIN_FREQ[o.frequency] || 'Monthly', yearly ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-slate-50 text-slate-600 ring-slate-200')}
+        ${kind === 'out' ? pill(FIN_TYPES[o.type] || 'Essential', o.type === 'discretionary' ? 'bg-violet-50 text-violet-700 ring-violet-200' : 'bg-teal-50 text-teal-700 ring-teal-200') : ''}
+        ${o.src === 'vault' ? pill(`${icon('shield-check', 'w-3 h-3')} From vault`, 'bg-indigo-50 text-indigo-700 ring-indigo-200') : ''}
+        ${yearly && o.dueDate ? `<span class="text-xs text-slate-500">next due ${fmtDate(nextAnnual(o.dueDate))}</span>` : ''}
+        ${yearly && kind === 'out' && !o.dueDate ? `<span class="text-xs text-amber-700">no due date</span>` : ''}
+      </div>
+      ${o.notes ? `<p class="text-xs text-slate-500 mt-1 break-words">${esc(o.notes)}</p>` : ''}
+    </div>
+    <div class="text-right shrink-0">
+      <p class="text-sm font-semibold text-slate-900 tabular-nums">${money(o.amount)}<span class="text-xs font-normal text-slate-500">/${perLabel(o)}</span></p>
+      ${yearly ? `<p class="text-xs text-slate-500 tabular-nums">${money(num(o.amount) / 12)}/mo</p>` : ''}
+    </div>
+    <div class="flex shrink-0 -mr-2">
+      <button type="button" data-action="fin-edit-${kind}" data-id="${o.id}" class="${ICON_BTN}" aria-label="Edit">${icon('pencil')}</button>
+      <button type="button" data-action="fin-del-${kind}" data-id="${o.id}" class="${ICON_BTN} hover:!text-rose-600" aria-label="${o.src === 'vault' ? 'Remove from budget' : 'Delete'}">${icon(o.src === 'vault' ? 'unlink' : 'trash-2')}</button>
+    </div>
+  </li>`;
+}
+
+function finBillsPotCard() {
+  const F = fin(), bp = billsPotStatus(), st = finStats();
+  const has = bp.items.length > 0;
+  const ok = bp.diff >= -0.5;
+  const upcoming = bp.items.filter(i => i.due).slice(0, 5);
+  return `<section class="${CARD} p-5">
+    <div class="flex items-start justify-between gap-2 mb-3">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('piggy-bank', 'w-5 h-5 text-amber-600')}${esc(F.billsPot.name)}</h3>
+      <button type="button" data-action="billspot-edit" class="${BTN_GHOST} !py-1.5 !text-xs shrink-0">${icon('pencil', 'w-3.5 h-3.5')}Update balance</button>
+    </div>
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="rounded-xl bg-slate-50 p-2.5"><p class="text-[11px] text-slate-500">Pay in monthly</p><p class="font-semibold text-slate-900 tabular-nums">${money(st.billsPot)}</p></div>
+      <div class="rounded-xl bg-slate-50 p-2.5"><p class="text-[11px] text-slate-500">Balance</p><p class="font-semibold text-slate-900 tabular-nums">${money(bp.balance)}</p></div>
+      <div class="rounded-xl bg-slate-50 p-2.5"><p class="text-[11px] text-slate-500">Should hold now</p><p class="font-semibold text-slate-900 tabular-nums">${money(bp.expected)}</p></div>
+    </div>
+    ${!has ? '<p class="text-sm text-slate-500 mt-3">No yearly bills yet – add outgoings set to “Yearly” and they’ll be saved for here at ÷ 12 a month.</p>'
+      : ok ? `<p class="mt-3 text-sm rounded-xl bg-emerald-50 text-emerald-800 px-3 py-2 flex gap-2 items-center">${icon('circle-check', 'w-4 h-4 shrink-0')}On track${bp.diff > 1 ? ` – ${money(bp.diff)} ahead` : ''}.</p>`
+      : `<p class="mt-3 text-sm rounded-xl bg-amber-50 text-amber-800 px-3 py-2 flex gap-2 items-start">${icon('triangle-alert', 'w-4 h-4 shrink-0 mt-0.5')}<span>Short by <b>${money(-bp.diff)}</b>. Top up the pot now, or spread it before the next bill${upcoming[0] ? ` on ${fmtDate(upcoming[0].due)}` : ''}.</span></p>`}
+    ${bp.undated ? `<p class="text-xs text-slate-500 mt-2">${bp.undated} yearly bill${bp.undated > 1 ? 's have' : ' has'} no due date, so ${bp.undated > 1 ? 'they are' : 'it is'} not included in “should hold now”.</p>` : ''}
+    ${upcoming.length ? `<ul class="mt-3 divide-y divide-slate-100">${upcoming.map(i => `
+      <li class="flex items-center gap-3 py-2 text-sm">
+        <span class="flex-1 min-w-0"><span class="block text-slate-800 truncate">${esc(i.o.name)}</span><span class="block text-xs text-slate-500">${fmtDate(i.due)} · ${relDays(i.days)}</span></span>
+        <span class="text-right"><span class="block font-medium tabular-nums">${money(i.o.amount)}</span><span class="block text-xs text-slate-500 tabular-nums">${money(i.expected)} saved by now</span></span>
+      </li>`).join('')}</ul>` : ''}
+  </section>`;
+}
+
+function finOverview(st) {
+  const F = fin();
+  if (!F.incomes.length && !st.outs.length && !F.pots.length) {
+    return `<div class="${CARD}">${emptyBox('wallet', 'Set up your budget', 'Add your take-home pay and regular outgoings, or let the bank CSV finder suggest them.',
+      `<div class="flex flex-wrap justify-center gap-2"><button type="button" data-action="fin-add-income" class="${BTN_PRIMARY}">${icon('plus')}Add income</button>
+       <button type="button" data-action="fin-add-out" class="${BTN_GHOST}">${icon('plus')}Add outgoing</button>
+       <button type="button" data-action="fin-tab" data-val="import" class="${BTN_GHOST}">${icon('file-search')}Find from bank CSV</button></div>`)}</div>`;
+  }
+  const row = (label, val, sub = '', cls = 'text-slate-900', strong = false) => `<div class="flex items-baseline justify-between gap-3 py-2">
+    <div class="min-w-0"><p class="text-sm ${strong ? 'font-semibold text-slate-900' : 'text-slate-700'}">${label}</p>${sub ? `<p class="text-xs text-slate-500">${sub}</p>` : ''}</div>
+    <p class="${strong ? 'text-lg font-bold' : 'font-semibold'} tabular-nums whitespace-nowrap ${cls}">${val}</p></div>`;
+  const pct = v => st.income > 0 ? Math.max(0, v / st.income * 100) : 0;
+  const segs = [[st.monthlyOut, 'bg-rose-400', 'Monthly outgoings'], [st.billsPot, 'bg-amber-400', 'Bills pot'], [st.savings, 'bg-sky-500', 'Savings'], [Math.max(0, st.left), 'bg-emerald-500', 'Left to spend']];
+  const cats = Object.entries(st.byCat).sort((a, b) => b[1] - a[1]);
+  const maxCat = cats.length ? cats[0][1] : 0;
+  const ed = st.essential + st.discretionary;
+  return `
+  <div class="grid lg:grid-cols-2 gap-4 items-start">
+    <section class="${CARD} p-5 lg:row-span-2">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-2">${icon('scale', 'w-5 h-5 text-teal-600')} Monthly budget</h3>
+      <div class="divide-y divide-slate-100">
+        ${row('Take-home income', money(st.income), `${F.incomes.length} source${F.incomes.length === 1 ? '' : 's'}`, 'text-emerald-700')}
+        ${row('Monthly outgoings', '− ' + money(st.monthlyOut), `${st.monthlyItems.length} item${st.monthlyItems.length === 1 ? '' : 's'}`)}
+        ${row('Annual bills pot (yearly ÷ 12)', '− ' + money(st.billsPot), `${money(st.yearlyTotal)} a year → ${esc(F.billsPot.name)}`)}
+        ${row('Available after bills', money(st.available), '', st.available < 0 ? 'text-rose-600' : 'text-slate-900', true)}
+        ${row('Savings pots', '− ' + money(st.savings), `${F.pots.length} pot${F.pots.length === 1 ? '' : 's'}`)}
+        ${row('Left to spend each month', money(st.left), st.left < 0 ? 'Over-committed – reduce savings or outgoings' : '', st.left < 0 ? 'text-rose-600' : 'text-emerald-700', true)}
+      </div>
+      ${st.income > 0 ? `<div class="mt-4">
+        <div class="h-3 rounded-full bg-slate-100 overflow-hidden flex">${segs.map(([v, c]) => `<div class="${c} h-full" style="width:${Math.min(100, pct(v))}%"></div>`).join('')}</div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2">${segs.map(([v, c, l]) => `<span class="inline-flex items-center gap-1.5 text-xs text-slate-600"><span class="w-2.5 h-2.5 rounded-full ${c}"></span>${l} ${Math.round(pct(v))}%</span>`).join('')}</div>
+      </div>` : ''}
+    </section>
+
+    <section class="${CARD} p-5">
+      <h3 class="font-semibold text-slate-900 mb-3">Essential vs discretionary <span class="text-xs font-normal text-slate-500">(monthly, incl. yearly ÷ 12)</span></h3>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div><p class="text-xs text-slate-500">Essential</p><p class="text-xl font-bold text-teal-700 tabular-nums">${money(st.essential)}</p></div>
+        <div><p class="text-xs text-slate-500">Discretionary</p><p class="text-xl font-bold text-violet-700 tabular-nums">${money(st.discretionary)}</p></div>
+      </div>
+      <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden flex"><div class="bg-teal-500 h-full" style="width:${ed ? st.essential / ed * 100 : 0}%"></div><div class="bg-violet-400 h-full" style="width:${ed ? st.discretionary / ed * 100 : 0}%"></div></div>
+    </section>
+
+    ${finBillsPotCard()}
+
+    <section class="${CARD} p-5 lg:col-span-2">
+      <h3 class="font-semibold text-slate-900 mb-3">Outgoings by category <span class="text-xs font-normal text-slate-500">(monthly equivalent)</span></h3>
+      ${cats.length ? `<ul class="space-y-3">${cats.map(([id, v]) => `<li>
+        <div class="flex justify-between gap-3 text-sm mb-1"><span class="text-slate-700">${esc(finCat('out', id).label)}</span><span class="tabular-nums text-slate-900 font-medium">${money(v)} <span class="text-xs font-normal text-slate-500">${st.income ? Math.round(v / st.income * 100) + '% of income' : ''}</span></span></div>
+        ${progress(maxCat ? v / maxCat * 100 : 0, 'bg-teal-500')}</li>`).join('')}</ul>` : '<p class="text-sm text-slate-500">No outgoings yet.</p>'}
+    </section>
+  </div>`;
+}
+
+function finIncomeTab(st) {
+  const F = fin();
+  const groups = F.incomeCats.map(c => ({ c, items: F.incomes.filter(o => finCat('income', o.categoryId).id === c.id) })).filter(g => g.items.length);
+  return `
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div><p class="text-xs text-slate-500">Joint monthly take-home</p><p class="text-2xl font-bold text-emerald-700 tabular-nums">${money(st.income)}</p></div>
+    <div class="flex gap-2"><button type="button" data-action="fin-cats" data-val="income" class="${BTN_GHOST}">${icon('tags')}Categories</button>
+    <button type="button" data-action="fin-add-income" class="${BTN_PRIMARY}">${icon('plus')}Add income</button></div>
+  </div>
+  <p class="text-sm text-slate-500 mb-4">Enter take-home pay only (after tax, NI and pension). Yearly amounts are spread ÷ 12.</p>
+  ${groups.length ? `<div class="space-y-4">${groups.map(g => `<section class="${CARD} px-4 md:px-5 pt-3">
+      <div class="flex justify-between text-sm"><h3 class="font-semibold text-slate-800">${esc(g.c.label)}</h3><span class="text-slate-500 tabular-nums">${money(sum(g.items, monthlyOf))}/mo</span></div>
+      <ul class="divide-y divide-slate-100">${g.items.map(o => finRow(o, 'income')).join('')}</ul></section>`).join('')}</div>`
+    : `<div class="${CARD}">${emptyBox('banknote', 'No income added', 'Add each take-home salary separately so either can be updated.')}</div>`}`;
+}
+
+function finOutTab(st) {
+  const F = fin();
+  const filters = { all: () => true, monthly: o => o.frequency !== 'yearly', yearly: o => o.frequency === 'yearly', essential: o => o.type !== 'discretionary', discretionary: o => o.type === 'discretionary' };
+  const f = filters[ui.finOutFilter] || filters.all;
+  const list = st.outs.filter(f);
+  const groups = F.outCats.map(c => ({ c, items: list.filter(o => finCat('out', o.categoryId).id === c.id).sort((a, b) => monthlyOf(b) - monthlyOf(a)) })).filter(g => g.items.length);
+  const count = k => st.outs.filter(filters[k]).length;
+  return `
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Monthly bills</p><p class="text-xl font-bold text-slate-900 tabular-nums">${money(st.monthlyOut)}</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Yearly bills</p><p class="text-xl font-bold text-slate-900 tabular-nums">${money(st.yearlyTotal)}</p><p class="text-xs text-slate-500">${money(st.billsPot)}/mo to the pot</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Essential</p><p class="text-xl font-bold text-teal-700 tabular-nums">${money(st.essential)}</p><p class="text-xs text-slate-500">per month</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Discretionary</p><p class="text-xl font-bold text-violet-700 tabular-nums">${money(st.discretionary)}</p><p class="text-xs text-slate-500">per month</p></div>
+  </div>
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+    ${filterPills([['all', 'All', count('all')], ['monthly', 'Monthly', count('monthly')], ['yearly', 'Yearly', count('yearly')], ['essential', 'Essential', count('essential')], ['discretionary', 'Discretionary', count('discretionary')]], ui.finOutFilter, 'fin-out-filter')}
+    <div class="flex gap-2"><button type="button" data-action="fin-cats" data-val="out" class="${BTN_GHOST}">${icon('tags')}Categories</button>
+    <button type="button" data-action="fin-add-out" class="${BTN_PRIMARY}">${icon('plus')}Add outgoing</button></div>
+  </div>
+  <p class="text-xs text-slate-500 mb-4">${icon('info', 'w-3.5 h-3.5 inline -mt-0.5')} Vault entries with “Include in budget” ticked appear here automatically – edit their cost in the vault.</p>
+  ${groups.length ? `<div class="space-y-4">${groups.map(g => `<section class="${CARD} px-4 md:px-5 pt-3">
+      <div class="flex justify-between text-sm"><h3 class="font-semibold text-slate-800">${esc(g.c.label)}</h3><span class="text-slate-500 tabular-nums">${money(sum(g.items, monthlyOf))}/mo</span></div>
+      <ul class="divide-y divide-slate-100">${g.items.map(o => finRow(o, 'out')).join('')}</ul></section>`).join('')}</div>`
+    : `<div class="${CARD}">${emptyBox('receipt', st.outs.length ? 'Nothing in this view' : 'No outgoings yet', st.outs.length ? '' : 'Add regular bills, or use “Find from bank CSV”.')}</div>`}`;
+}
+
+function finSavingsTab(st) {
+  const F = fin();
+  return `
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Available after bills</p><p class="text-xl font-bold tabular-nums ${st.available < 0 ? 'text-rose-600' : 'text-slate-900'}">${money(st.available)}</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">To savings</p><p class="text-xl font-bold text-sky-700 tabular-nums">${money(st.savings)}</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Left to spend</p><p class="text-xl font-bold tabular-nums ${st.left < 0 ? 'text-rose-600' : 'text-emerald-700'}">${money(st.left)}</p></div>
+  </div>
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+    <p class="text-sm text-slate-500">Try different monthly amounts – the totals update as you change them.</p>
+    <button type="button" data-action="pot-new" class="${BTN_PRIMARY}">${icon('plus')}Add savings pot</button>
+  </div>
+  <div class="grid md:grid-cols-2 gap-4 items-start mb-4">
+    ${st.potAlloc.length ? st.potAlloc.map(({ p, monthly }) => {
+      const target = num(p.target), bal = num(p.balance);
+      const toGo = Math.max(0, target - bal);
+      const months = target && monthly > 0 ? Math.ceil(toGo / monthly) : null;
+      const reach = months !== null ? new Date(new Date().getFullYear(), new Date().getMonth() + months, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '';
+      let byDate = '';
+      if (target && p.targetDate) {
+        const m = Math.max(1, Math.ceil(daysUntil(p.targetDate) / 30.44));
+        const need = toGo / m;
+        byDate = `<p class="text-xs mt-1 ${need > monthly + 0.5 ? 'text-amber-700' : 'text-emerald-700'}">To reach it by ${fmtDate(p.targetDate)}: ${money(need)}/mo${need > monthly + 0.5 ? ` (${money(need - monthly)} more than now)` : ' ✓'}</p>`;
+      }
+      return `<article class="${CARD} p-4 md:p-5">
+        <div class="flex items-start gap-3">
+          <span class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">${icon('piggy-bank', 'w-5 h-5')}</span>
+          <div class="flex-1 min-w-0"><h3 class="font-semibold text-slate-900 break-words">${esc(p.name)}</h3>${p.notes ? `<p class="text-xs text-slate-500 break-words">${esc(p.notes)}</p>` : ''}</div>
+          <button type="button" data-action="pot-edit" data-id="${p.id}" class="${ICON_BTN}" aria-label="Edit pot">${icon('pencil')}</button>
+          <button type="button" data-action="pot-del" data-id="${p.id}" class="${ICON_BTN} -mr-2 hover:!text-rose-600" aria-label="Delete pot">${icon('trash-2')}</button>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <div class="relative w-28">${p.mode === 'percent' ? '' : '<span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">£</span>'}
+            <input data-change="pot-value" data-id="${p.id}" value="${esc(p.value || '')}" inputmode="decimal" aria-label="Monthly allocation" class="${INPUT} !py-2 ${p.mode === 'percent' ? '' : 'pl-7'}"></div>
+          <select data-change="pot-mode" data-id="${p.id}" aria-label="Allocation type" class="${INPUT} !py-2 !w-auto">
+            <option value="fixed" ${p.mode !== 'percent' ? 'selected' : ''}>£ per month</option><option value="percent" ${p.mode === 'percent' ? 'selected' : ''}>% of available</option></select>
+          <span class="text-sm text-slate-600">= <b class="tabular-nums">${money(monthly)}</b>/mo</span>
+        </div>
+        ${target ? `<div class="mt-3"><div class="flex justify-between text-xs text-slate-500 mb-1"><span>${money(bal)} of ${money(target)}</span><span>${months === null ? '' : months === 0 ? 'Target reached' : `≈ ${months} month${months === 1 ? '' : 's'} (${reach})`}</span></div>${progress(target ? bal / target * 100 : 0, 'bg-sky-500')}${byDate}</div>`
+          : bal ? `<p class="text-xs text-slate-500 mt-3">Current balance ${money(bal)}</p>` : ''}
+      </article>`;
+    }).join('') : `<div class="${CARD} md:col-span-2">${emptyBox('piggy-bank', 'No savings pots yet', 'Create the savings accounts you’re considering, then try different monthly amounts to see what’s left.')}</div>`}
+  </div>
+  ${finBillsPotCard()}`;
+}
+
+function finImportTab() {
+  const S = csvSession;
+  const colOpts = f => [[-1, '— none —'], ...f.header.map((h, i) => [i, h || `Column ${i + 1}`])];
+  const mapSel = (f, fi, key, label) => `<label class="block"><span class="block text-xs text-slate-500 mb-1">${label}</span>
+    <select data-change="csv-map" data-file="${fi}" data-key="${key}" class="${INPUT} !py-1.5 !text-sm">${colOpts(f).map(([k, v]) => `<option value="${k}" ${Number(f.map[key]) === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`;
+  const filesHtml = S ? S.files.map((f, fi) => {
+    const tx = f.txns || [];
+    const dates = tx.map(t => t.date).sort();
+    return `<div class="rounded-xl bg-slate-50 ring-1 ring-slate-200 p-3">
+      <div class="flex items-start gap-3">
+        <span class="w-9 h-9 rounded-lg bg-white ring-1 ring-slate-200 text-slate-500 flex items-center justify-center shrink-0">${icon('file-text')}</span>
+        <div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-800 truncate">${esc(f.name)}</p>
+          <p class="text-xs ${f.error ? 'text-rose-600' : 'text-slate-500'}">${f.error ? esc(f.error) : `${esc(f.bank)} · ${tx.length} transactions${dates.length ? ` · ${fmtDate(dates[0])} – ${fmtDate(dates[dates.length - 1])}` : ''}`}</p></div>
+        <button type="button" data-action="csv-remove" data-val="${fi}" class="${ICON_BTN} !w-8 !h-8" aria-label="Remove file">${icon('x', 'w-3.5 h-3.5')}</button>
+      </div>
+      ${!f.error && f.header ? `<details class="mt-2" ${tx.length ? '' : 'open'}><summary class="text-xs font-medium text-teal-700">Column mapping${tx.length ? '' : ' – no transactions found, please check'}</summary>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+          ${mapSel(f, fi, 'date', 'Date')}${mapSel(f, fi, 'desc', 'Description / payee')}${mapSel(f, fi, 'amount', 'Amount (+/−)')}
+          ${mapSel(f, fi, 'in', 'Money in')}${mapSel(f, fi, 'out', 'Money out')}${mapSel(f, fi, 'type', 'Type (optional)')}
+        </div>
+        <label class="mt-2 flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" data-change="csv-map" data-file="${fi}" data-key="flip" ${f.map.flip ? 'checked' : ''} class="accent-teal-600"> Payments out are shown as positive numbers in this file</label>
+        <p class="text-[11px] text-slate-400 mt-1">Use either Amount, or Money in + Money out. The mapping is remembered for this layout.</p>
+      </details>` : ''}
+    </div>`;
+  }).join('') : '';
+
+  const confPill = s => s.conf === 'high' ? pill('Strong match', 'bg-emerald-50 text-emerald-700 ring-emerald-200') : s.conf === 'medium' ? pill('Likely', 'bg-amber-50 text-amber-700 ring-amber-200') : pill('Possible', 'bg-slate-100 text-slate-600 ring-slate-200');
+  const sugCard = (s, i) => {
+    const cats = s.dir === 'in' ? fin().incomeCats : fin().outCats;
+    const evidence = s.kind === 'variable'
+      ? `${s.count} payments over the period · averages ${money(s.amount)}/month`
+      : s.kind === 'once' ? `Direct debit seen once on ${fmtDate(s.last)} – may be annual`
+      : `${s.count} payments · ${s.intervalLabel} (~${s.interval} days) · last ${fmtDate(s.last)}${s.min !== s.max ? ` · ${money(s.min)}–${money(s.max)}` : ''}${s.intervalLabel === 'weekly' || s.intervalLabel === 'fortnightly' ? ' · converted to monthly' : ''}${s.intervalLabel === 'quarterly' || s.intervalLabel === 'six-monthly' ? ' · converted to a yearly total' : ''}`;
+    return `<div class="rounded-xl ring-1 ring-slate-200 p-3 ${s.tracked || s.transfer ? 'bg-slate-50' : 'bg-white'}">
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="pick" value="${i}" ${s.checked ? 'checked' : ''} class="mt-0.5 w-5 h-5 accent-teal-600 shrink-0">
+        <span class="flex-1 min-w-0"><span class="flex flex-wrap gap-1.5 mb-1">${confPill(s)}
+          ${s.mandate ? pill('Direct debit / SO', 'bg-sky-50 text-sky-700 ring-sky-200') : ''}
+          ${s.tracked ? pill('Already in budget', 'bg-teal-50 text-teal-700 ring-teal-200') : ''}
+          ${s.transfer ? pill('Looks like a transfer', 'bg-slate-100 text-slate-600 ring-slate-200') : ''}
+          ${s.stopped ? pill('May have stopped', 'bg-rose-50 text-rose-700 ring-rose-200') : ''}
+          ${pill(esc(s.account), 'bg-white text-slate-500 ring-slate-200')}</span>
+          <span class="block text-xs text-slate-500">${evidence}</span></span>
+      </label>
+      <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 mt-2">
+        <input name="name_${i}" value="${esc(s.name)}" aria-label="Name" class="${INPUT} !py-2 col-span-2">
+        <div class="relative"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">£</span><input name="amount_${i}" value="${(Math.round(s.amount * 100) / 100).toFixed(2)}" inputmode="decimal" aria-label="Amount" class="${INPUT} !py-2 pl-7"></div>
+        <select name="freq_${i}" aria-label="Frequency" class="${INPUT} !py-2">${Object.entries(FIN_FREQ).map(([k, l]) => `<option value="${k}" ${s.freq === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <select name="cat_${i}" aria-label="Category" class="${INPUT} !py-2 ${s.dir === 'in' ? 'col-span-2' : ''}">${cats.map(c => `<option value="${c.id}" ${s.categoryId === c.id ? 'selected' : ''}>${esc(c.label)}</option>`).join('')}</select>
+        ${s.dir === 'out' ? `<select name="type_${i}" aria-label="Essential or discretionary" class="${INPUT} !py-2">${Object.entries(FIN_TYPES).map(([k, l]) => `<option value="${k}" ${s.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
+      </div>
+      ${s.vaultId ? `<label class="mt-2 flex items-start gap-2 text-xs text-indigo-800 bg-indigo-50 rounded-lg px-2.5 py-2"><input type="checkbox" name="link_${i}" checked class="mt-0.5 accent-indigo-600">
+        Matches vault entry “${esc(s.vaultName)}” – include that entry in the budget instead of adding a duplicate (its vault cost is used).</label>` : ''}
+    </div>`;
+  };
+  const sugs = S ? S.sugs : [];
+  const section = (title, sub, filter) => {
+    const idx = sugs.map((s, i) => [s, i]).filter(([s]) => filter(s));
+    return idx.length ? `<div class="space-y-2"><h4 class="text-sm font-semibold text-slate-800 mt-4">${title} <span class="font-normal text-slate-400">${idx.length}</span></h4>${sub ? `<p class="text-xs text-slate-500">${sub}</p>` : ''}${idx.map(([s, i]) => sugCard(s, i)).join('')}</div>` : '';
+  };
+
+  return `
+  <section class="${CARD} p-5 mb-4">
+    <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-1">${icon('file-search', 'w-5 h-5 text-teal-600')} Find regular payments from bank statements</h3>
+    <p class="text-sm text-slate-500">Upload CSV exports from Monzo, HSBC or Santander (or any bank). 3–12 months of history works best – yearly bills need at least a year to be spotted reliably.</p>
+    <p class="mt-3 text-xs rounded-xl bg-teal-50 text-teal-800 px-3 py-2 flex gap-2">${icon('lock', 'w-4 h-4 shrink-0')}<span>Files are read on this device only. Transactions are never saved or uploaded – only the items you choose to add are kept.</span></p>
+    <label class="mt-4 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-400 hover:bg-teal-50/40 p-6 cursor-pointer transition text-center">
+      <span class="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">${icon('upload', 'w-5 h-5')}</span>
+      <span class="text-sm font-medium text-slate-800">${S ? 'Add more statement files' : 'Choose statement files'}</span>
+      <span class="text-xs text-slate-500">.csv (Monzo, HSBC, Santander, others) or Santander .txt · select several at once</span>
+      <input type="file" id="csv-input" multiple accept=".csv,.txt,text/csv,text/plain" class="sr-only">
+    </label>
+    <details class="mt-3"><summary class="text-xs font-medium text-slate-600 flex items-center gap-1">How to export from each bank<span class="chev transition">${icon('chevron-down', 'w-3.5 h-3.5')}</span></summary>
+      <ul class="mt-2 text-xs text-slate-600 space-y-1.5 list-disc pl-5">
+        <li><b>Monzo:</b> app → Home → account → <i>Statements</i> / <i>Export transactions</i> → choose CSV and a date range (or web.monzo.com).</li>
+        <li><b>HSBC:</b> online banking → account → <i>Download transactions</i> → CSV.</li>
+        <li><b>Santander:</b> online banking → account → <i>Download transactions</i> → choose the CSV or text (.txt) option.</li>
+      </ul></details>
+  </section>
+
+  ${S ? `<section class="${CARD} p-5 mb-4">
+    <div class="flex items-center justify-between gap-2 mb-3"><h3 class="font-semibold text-slate-900">Files <span class="font-normal text-slate-400">${S.files.length}</span></h3>
+      <button type="button" data-action="csv-clear" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('eraser', 'w-3.5 h-3.5')}Clear all</button></div>
+    <div class="space-y-2">${filesHtml}</div>
+  </section>
+
+  <form data-form="csv-apply" class="${CARD} p-5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="font-semibold text-slate-900">${sugs.length ? `Suggestions <span class="font-normal text-slate-400">${sugs.length}</span>` : 'No regular payments found'}</h3>
+      ${sugs.length ? `<div class="flex gap-2"><button type="button" data-action="csv-sel" data-val="all" class="text-xs font-medium text-teal-700">Select all</button><span class="text-slate-300">|</span><button type="button" data-action="csv-sel" data-val="none" class="text-xs font-medium text-teal-700">Select none</button></div>` : ''}
+    </div>
+    ${sugs.length ? `<p class="text-xs text-slate-500 mt-1">Strong and likely matches are pre-ticked. Check names, amounts and categories, then add.</p>` : `<p class="text-sm text-slate-500 mt-1">${S.txCount ? 'Try a longer date range, or check the column mapping above.' : 'No transactions could be read – check the column mapping above.'}</p>`}
+    ${section('Income', 'Regular money coming in (e.g. salaries).', s => s.dir === 'in')}
+    ${section('Regular outgoings', 'Payments that repeat on a schedule.', s => s.dir === 'out' && s.kind !== 'variable')}
+    ${section('Variable spending', 'Frequent but irregular spending (e.g. groceries, fuel), shown as a monthly average. Not ticked by default.', s => s.kind === 'variable')}
+    ${sugs.length ? `<div class="sticky bottom-20 md:bottom-4 mt-5 flex justify-end"><button type="submit" class="${BTN_PRIMARY} shadow-lg">${icon('check')}Add selected to budget</button></div>` : ''}
+  </form>` : ''}`;
 }
 
 /* ============================== 7. FORMS ============================== */
@@ -1356,21 +1836,27 @@ function vaultForm(id) {
   openModal({
     title: v ? 'Edit vault entry' : 'Add to Household Vault', submitLabel: v ? 'Save' : 'Add entry', wide: true,
     body: `<div class="grid sm:grid-cols-2 gap-4">
-        ${field('Category', sel('category', VAULT_CATS.map(c => [c.id, c.label]), v?.category || ui.vaultCat !== 'all' && ui.vaultCat || 'home'))}
+        ${field('Category', sel('category', vcats().map(c => [c.id, c.label]), (v && vcat(v.category).id) || (ui.vaultCat !== 'all' && ui.vaultCat) || vcats()[0].id))}
         ${field('Provider name', inp('provider', v?.provider, 'required placeholder="e.g. Aviva"'))}
         ${field('Description', inp('name', v?.name, 'placeholder="e.g. Buildings & contents"'))}
         ${field('Policy / account number', inp('accountNo', v?.accountNo, 'placeholder="e.g. AV-123456"'))}
         ${field('Renewal / end date', inp('renewalDate', v?.renewalDate, 'type="date"'))}
-        <div>${field('Cost', `<div class="flex gap-2">${moneyInp('cost', v?.cost)}<div class="flex rounded-xl bg-slate-100 p-1 shrink-0">
+        <div>${fieldDiv('Cost', `<div class="flex gap-2">${moneyInp('cost', v?.cost)}<div class="flex rounded-xl bg-slate-100 p-1 shrink-0">
           ${[['monthly', 'Monthly'], ['annual', 'Annual']].map(([k, l]) => `<label class="cursor-pointer"><input type="radio" name="costPeriod" value="${k}" class="peer sr-only" ${(v?.costPeriod || 'monthly') === k ? 'checked' : ''}><span class="block rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 peer-checked:bg-white peer-checked:shadow-sm peer-checked:text-slate-900">${l}</span></label>`).join('')}</div></div>`)}</div>
       </div>
       ${chk('autoRenew', 'Auto-renews', v ? v.autoRenew : true, 'Untick if it ends or needs action (e.g. fixed-rate mortgage reverting to SVR).')}
       <div class="rounded-xl bg-teal-50 p-3 ring-1 ring-teal-100">${field(`${icon('map-pin', 'w-4 h-4 inline -mt-0.5 text-teal-600')} Where to find it`, inp('location', v?.location, 'placeholder="e.g. Blue folder in study filing cabinet / Joint Gmail – search \'Aviva\' / 1Password Shared Vault"'), 'Exactly where the paperwork, emails or logins live.')}</div>
+      <div class="rounded-xl ring-1 ring-slate-200 p-3 space-y-3">
+        ${chk('inBudget', 'Include in finance planner budget', v ? !!v.inBudget : false, 'The cost and Monthly/Annual setting above feed the budget automatically. Annual costs are saved for via the bills pot, using the renewal date.')}
+        <div class="grid grid-cols-2 gap-3">${field('Budget category', sel('finCat', fin().outCats.map(c => [c.id, c.label]), v ? vaultFinCat(v) : 'out_other'))}
+        ${field('Type', sel('finType', Object.entries(FIN_TYPES), v?.finType || 'essential'))}</div>
+      </div>
       ${field('Login / portal URL', inp('url', v?.url, 'placeholder="https://…"'))}
       ${field('Notes', ta('notes', v?.notes, 'placeholder="Excess amounts, cancellation notice period, broker contact…"'))}`,
     onSubmit: fd => {
       const data = { category: fd.get('category'), provider: fd.get('provider').trim(), name: fd.get('name').trim(), accountNo: fd.get('accountNo').trim(), renewalDate: fd.get('renewalDate') || '',
-        cost: num(fd.get('cost')), costPeriod: fd.get('costPeriod') || 'monthly', autoRenew: fd.get('autoRenew') === 'on', location: fd.get('location').trim(), url: fd.get('url').trim(), notes: fd.get('notes').trim() };
+        cost: num(fd.get('cost')), costPeriod: fd.get('costPeriod') || 'monthly', autoRenew: fd.get('autoRenew') === 'on', location: fd.get('location').trim(), url: fd.get('url').trim(), notes: fd.get('notes').trim(),
+        inBudget: fd.get('inBudget') === 'on', finCat: fd.get('finCat') || '', finType: fd.get('finType') === 'discretionary' ? 'discretionary' : 'essential' };
       const cur = id ? byId(state.vault, id) : null;
       if (cur) Object.assign(cur, data, { updatedAt: Date.now() }); else state.vault.push(touch({ id: uid(), ...data }));
       commit(); toast(cur ? 'Saved' : 'Added to vault');
@@ -1387,6 +1873,421 @@ function openQuickAdd() {
       <button type="button" data-action="${a}" class="rounded-2xl ring-1 ring-slate-200 hover:ring-teal-300 hover:bg-slate-50 p-4 flex flex-col items-center gap-2 transition">
         <span class="w-11 h-11 rounded-xl ${c} flex items-center justify-center">${icon(i, 'w-5 h-5')}</span><span class="text-sm font-medium text-slate-700 text-center">${l}</span></button>`).join('')}</div>`
   });
+}
+
+/* ---------- Vault categories ---------- */
+function vaultCatsModal() {
+  const L = vcats();
+  openModal({
+    title: 'Vault categories',
+    body: `<p class="text-sm text-slate-500">Add, rename, reorder or remove categories. Deleting a category moves its entries to “Other”.</p>
+      <ul class="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">${L.map((c0, i) => {
+        const c = vcat(c0.id); const n = state.vault.filter(v => vcat(v.category).id === c.id).length;
+        return `<li class="flex items-center gap-2 px-3 py-2">
+          <span class="w-8 h-8 rounded-lg ${c.bg} ${c.fg} flex items-center justify-center shrink-0">${icon(c.icon)}</span>
+          <span class="flex-1 min-w-0"><span class="block text-sm font-medium text-slate-800 truncate">${esc(c.label)}</span><span class="block text-xs text-slate-500">${n} entr${n === 1 ? 'y' : 'ies'}</span></span>
+          <button type="button" data-action="vcat-move" data-id="${c.id}" data-val="-1" class="${ICON_BTN} !w-8 !h-8" ${i === 0 ? 'disabled style="opacity:.3"' : ''} aria-label="Move up">${icon('arrow-up', 'w-3.5 h-3.5')}</button>
+          <button type="button" data-action="vcat-move" data-id="${c.id}" data-val="1" class="${ICON_BTN} !w-8 !h-8" ${i === L.length - 1 ? 'disabled style="opacity:.3"' : ''} aria-label="Move down">${icon('arrow-down', 'w-3.5 h-3.5')}</button>
+          <button type="button" data-action="vcat-edit" data-id="${c.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Edit">${icon('pencil', 'w-3.5 h-3.5')}</button>
+          ${c.id === 'other' ? '<span class="w-8"></span>' : `<button type="button" data-action="vcat-delete" data-id="${c.id}" class="${ICON_BTN} !w-8 !h-8 hover:!text-rose-600" aria-label="Delete">${icon('trash-2', 'w-3.5 h-3.5')}</button>`}
+        </li>`; }).join('')}</ul>
+      <button type="button" data-action="vcat-new" class="${BTN_SOFT} w-full">${icon('plus')}Add category</button>`
+  });
+}
+function vaultCatForm(id) {
+  const c = id ? vcats().find(x => x.id === id) : null;
+  openModal({
+    title: c ? 'Edit category' : 'New vault category', submitLabel: c ? 'Save' : 'Add',
+    body: `${field('Name', inp('label', c?.label, 'required placeholder="e.g. Pets, Pensions, Vehicles"'))}
+      <div><span class="block text-sm font-medium text-slate-700 mb-1.5">Colour</span><div class="flex flex-wrap gap-2.5">${Object.entries(COLOURS).map(([k, v]) => `<label class="cursor-pointer" title="${k}"><input type="radio" name="colour" value="${k}" class="peer sr-only" ${(c?.colour || 'teal') === k ? 'checked' : ''}><span class="block w-8 h-8 rounded-full ${v.dot} ring-2 ring-offset-2 ring-transparent peer-checked:ring-slate-800"></span></label>`).join('')}</div></div>
+      <div><span class="block text-sm font-medium text-slate-700 mb-1.5">Icon</span><div class="grid grid-cols-6 sm:grid-cols-8 gap-2">${CAT_ICONS.map(n => `<label class="cursor-pointer"><input type="radio" name="icon" value="${n}" class="peer sr-only" ${(c?.icon || 'folder') === n ? 'checked' : ''}><span class="flex items-center justify-center h-10 rounded-xl ring-1 ring-slate-200 text-slate-600 peer-checked:ring-2 peer-checked:ring-teal-500 peer-checked:bg-teal-50 peer-checked:text-teal-700">${icon(n, 'w-5 h-5')}</span></label>`).join('')}</div></div>`,
+    onSubmit: fd => {
+      const data = { label: String(fd.get('label') || '').trim(), colour: fd.get('colour') || 'teal', icon: fd.get('icon') || 'folder' };
+      if (!data.label) return false;
+      const cur = id ? state.vaultCats.find(x => x.id === id) : null;
+      if (cur) Object.assign(cur, data);
+      else state.vaultCats.splice(Math.max(0, state.vaultCats.length - 1), 0, { id: 'vc_' + uid(), ...data });  // keep "Other" last
+      commit(); vaultCatsModal();
+    }
+  });
+}
+
+/* ---------- Finance forms ---------- */
+function finItemForm(kind, id) {
+  const F = fin();
+  const list = kind === 'income' ? F.incomes : F.outgoings;
+  const o = id ? byId(list, id) : null;
+  const cats = kind === 'income' ? F.incomeCats : F.outCats;
+  const defCat = (o && o.categoryId) || (cats[0] && cats[0].id);
+  const defType = o ? o.type : ((cats.find(c => c.id === defCat) || {}).essential === false ? 'discretionary' : 'essential');
+  openModal({
+    title: o ? `Edit ${kind === 'income' ? 'income' : 'outgoing'}` : (kind === 'income' ? 'Add income' : 'Add outgoing'), submitLabel: o ? 'Save' : 'Add',
+    body: `${field('Name', inp('name', o?.name, `required placeholder="${kind === 'income' ? 'e.g. Rob – salary' : 'e.g. Council tax'}"`))}
+      ${field(kind === 'income' ? 'Take-home amount' : 'Amount', moneyInp('amount', o?.amount), kind === 'income' ? 'After tax, NI and pension.' : '')}
+      ${fieldDiv('How often', seg('frequency', Object.entries(FIN_FREQ), o?.frequency || 'monthly'), kind === 'out' ? 'Yearly bills are saved for at ÷ 12 a month in the bills pot.' : 'Yearly amounts are spread ÷ 12.')}
+      ${field('Category', sel('categoryId', cats.map(c => [c.id, c.label]), defCat))}
+      ${kind === 'out' ? fieldDiv('Type', seg('type', Object.entries(FIN_TYPES), defType || 'essential')) : ''}
+      ${kind === 'out' ? field('Next payment date (yearly bills)', inp('dueDate', o?.dueDate, 'type="date"'), 'Used to check the bills pot is on track. Leave blank for monthly items.') : ''}
+      ${field('Notes', ta('notes', o?.notes, 'placeholder="Optional"'))}`,
+    onSubmit: fd => {
+      const amount = num(fd.get('amount'));
+      if (amount <= 0) { toast('Enter an amount above £0', 'error'); return false; }
+      const data = { name: String(fd.get('name') || '').trim(), amount, frequency: fd.get('frequency') === 'yearly' ? 'yearly' : 'monthly', categoryId: fd.get('categoryId'), notes: String(fd.get('notes') || '').trim() };
+      if (kind === 'out') { data.type = fd.get('type') === 'discretionary' ? 'discretionary' : 'essential'; data.dueDate = fd.get('dueDate') || ''; }
+      const arr = kind === 'income' ? fin().incomes : fin().outgoings;
+      const cur = id ? byId(arr, id) : null;
+      if (cur) Object.assign(cur, data, { updatedAt: Date.now() }); else arr.push(touch({ id: uid(), ...data }));
+      commit(); toast(cur ? 'Saved' : 'Added');
+    }
+  });
+  if (kind === 'out' && !o) {   // new outgoing: default Essential/Discretionary from the chosen category
+    const s = $('#modal-form select[name=categoryId]');
+    if (s) s.addEventListener('change', () => {
+      const c = fin().outCats.find(x => x.id === s.value);
+      const r = $(`#modal-form input[name=type][value=${c && c.essential === false ? 'discretionary' : 'essential'}]`);
+      if (r) r.checked = true;
+    });
+  }
+}
+
+function finCatsModal(kind) {
+  const F = fin();
+  const L = kind === 'income' ? F.incomeCats : F.outCats;
+  const fallback = kind === 'income' ? 'inc_other' : 'out_other';
+  const used = id => (kind === 'income' ? F.incomes : finOutgoings()).filter(o => finCat(kind, o.categoryId).id === id).length;
+  openModal({
+    title: kind === 'income' ? 'Income categories' : 'Outgoing categories', submitLabel: 'Add category',
+    body: `<ul class="divide-y divide-slate-100 rounded-xl ring-1 ring-slate-200">${L.map((c, i) => `
+      <li class="flex items-center gap-2 px-3 py-2">
+        <span class="flex-1 min-w-0"><span class="block text-sm font-medium text-slate-800">${esc(c.label)}</span>
+          <span class="block text-xs text-slate-500">${used(c.id)} item${used(c.id) === 1 ? '' : 's'}${kind === 'out' ? ' · default ' + (c.essential === false ? 'discretionary' : 'essential') : ''}</span></span>
+        <button type="button" data-action="fincat-move" data-kind="${kind}" data-id="${c.id}" data-val="-1" class="${ICON_BTN} !w-8 !h-8" ${i === 0 ? 'disabled style="opacity:.3"' : ''} aria-label="Move up">${icon('arrow-up', 'w-3.5 h-3.5')}</button>
+        <button type="button" data-action="fincat-move" data-kind="${kind}" data-id="${c.id}" data-val="1" class="${ICON_BTN} !w-8 !h-8" ${i === L.length - 1 ? 'disabled style="opacity:.3"' : ''} aria-label="Move down">${icon('arrow-down', 'w-3.5 h-3.5')}</button>
+        <button type="button" data-action="fincat-edit" data-kind="${kind}" data-id="${c.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Edit">${icon('pencil', 'w-3.5 h-3.5')}</button>
+        ${c.id === fallback ? '<span class="w-8"></span>' : `<button type="button" data-action="fincat-del" data-kind="${kind}" data-id="${c.id}" class="${ICON_BTN} !w-8 !h-8 hover:!text-rose-600" aria-label="Delete">${icon('trash-2', 'w-3.5 h-3.5')}</button>`}
+      </li>`).join('')}</ul>
+      <div class="rounded-xl bg-slate-50 p-3 space-y-3">${field('New category', inp('newLabel', '', 'placeholder="e.g. Pets"'))}${kind === 'out' ? seg('newType', Object.entries(FIN_TYPES), 'essential') : ''}</div>`,
+    onSubmit: fd => {
+      const label = String(fd.get('newLabel') || '').trim();
+      if (!label) { toast('Type a category name', 'error'); return false; }
+      const list = kind === 'income' ? fin().incomeCats : fin().outCats;
+      const c = { id: 'fc_' + uid(), label };
+      if (kind === 'out') c.essential = fd.get('newType') !== 'discretionary';
+      list.splice(Math.max(0, list.length - 1), 0, c);   // keep "Other" last
+      commit(); finCatsModal(kind);
+    }
+  });
+}
+function finCatEditForm(kind, id) {
+  const list = kind === 'income' ? fin().incomeCats : fin().outCats;
+  const c = list.find(x => x.id === id); if (!c) return;
+  openModal({
+    title: 'Edit category',
+    body: `${field('Name', inp('label', c.label, 'required'))}${kind === 'out' ? fieldDiv('Default type for new items', seg('etype', Object.entries(FIN_TYPES), c.essential === false ? 'discretionary' : 'essential')) : ''}`,
+    onSubmit: fd => {
+      const cc = (kind === 'income' ? fin().incomeCats : fin().outCats).find(x => x.id === id); if (!cc) return;
+      cc.label = String(fd.get('label') || '').trim() || cc.label;
+      if (kind === 'out') cc.essential = fd.get('etype') !== 'discretionary';
+      commit(); finCatsModal(kind);
+    }
+  });
+}
+
+function potForm(id) {
+  const p = id ? byId(fin().pots, id) : null;
+  openModal({
+    title: p ? 'Edit savings pot' : 'New savings pot', submitLabel: p ? 'Save' : 'Add pot',
+    body: `${field('Name', inp('name', p?.name, 'required placeholder="e.g. Emergency fund, Holiday, House deposit"'))}
+      ${fieldDiv('Allocation type', seg('mode', [['fixed', '£ per month'], ['percent', '% of available']], p?.mode || 'fixed'))}
+      ${field('Monthly allocation', inp('value', p?.value ?? '', 'inputmode="decimal" placeholder="e.g. 200 (or 10 for 10%)"'), 'A fixed £ amount, or a percentage of what’s available after bills.')}
+      <div class="grid grid-cols-2 gap-3">${field('Target (optional)', moneyInp('target', p?.target))}${field('Current balance', moneyInp('balance', p?.balance))}</div>
+      ${field('Target date (optional)', inp('targetDate', p?.targetDate, 'type="date"'))}
+      ${field('Notes', inp('notes', p?.notes, 'placeholder="e.g. Chase easy-access 4.1%"'))}`,
+    onSubmit: fd => {
+      const data = { name: String(fd.get('name') || '').trim(), mode: fd.get('mode') === 'percent' ? 'percent' : 'fixed', value: num(fd.get('value')), target: num(fd.get('target')), balance: num(fd.get('balance')), targetDate: fd.get('targetDate') || '', notes: String(fd.get('notes') || '').trim() };
+      const cur = id ? byId(fin().pots, id) : null;
+      if (cur) Object.assign(cur, data, { updatedAt: Date.now() }); else fin().pots.push(touch({ id: uid(), ...data }));
+      commit();
+    }
+  });
+}
+function billsPotForm() {
+  const b = fin().billsPot;
+  openModal({
+    title: 'Annual bills pot',
+    body: `${field('Pot name', inp('name', b.name, 'required'))}
+      ${field('Current balance', moneyInp('balance', b.balance))}
+      <p class="text-xs text-slate-500">Every yearly bill is saved for at ÷ 12 a month. “Should hold now” assumes each bill has been saved for since its last payment, using its due date.</p>`,
+    onSubmit: fd => { const bb = fin().billsPot; bb.name = String(fd.get('name') || '').trim() || bb.name; bb.balance = num(fd.get('balance')); bb.updatedAt = Date.now(); commit(); }
+  });
+}
+
+/* ===================== 7b. BANK CSV – REGULAR PAYMENT FINDER =====================
+   Statement files are parsed in memory only (csvSession). Nothing from them is
+   persisted or synced – only the items the user confirms are added to the budget. */
+let csvSession = null;
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+function parseCSVText(text) {
+  text = String(text).replace(/^\uFEFF/, '');
+  const sample = text.slice(0, 3000);
+  const delim = [',', ';', '\t'].map(d => [d, sample.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.map(r => r.map(x => x.replace(/\u00a0/g, ' ').trim())).filter(r => r.some(x => x !== ''));
+}
+/** Santander "Download transactions" text format: Date: / Description: / Amount: / Balance: blocks. */
+function parseSantanderTxt(text) {
+  const rows = [['Date', 'Description', 'Amount']]; let cur = null;
+  String(text).replace(/\u00a0/g, ' ').split(/\r?\n/).forEach(line => {
+    const m = line.match(/^\s*(Date|Description|Amount)\s*:\s*(.*)$/i); if (!m) return;
+    const k = m[1].toLowerCase();
+    if (k === 'date') { if (cur) rows.push(cur); cur = [m[2].trim(), '', '']; }
+    else if (cur) cur[k === 'description' ? 1 : 2] = m[2].replace(/\s*GBP\s*$/i, '').trim();
+  });
+  if (cur) rows.push(cur);
+  return rows;
+}
+/** UK-first date parsing: dd/mm/yyyy, dd-mm-yy, yyyy-mm-dd, 12 Oct 2025, 12-Oct-25. */
+function parseDateAny(s) {
+  s = String(s || '').trim(); let m;
+  const mk = (y, mo, d) => { y = Number(y); if (y < 100) y += 2000; mo = Number(mo); d = Number(d); if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y > 1990 && y < 2200)) return null; return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0'); };
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return mk(m[1], m[2], m[3]);
+  if ((m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/))) return mk(m[3], m[2], m[1]);
+  if ((m = s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[A-Za-z]*[\s\-,]+(\d{2,4})\b/))) { const mo = MONTHS[m[2].toLowerCase()]; return mo ? mk(m[3], mo, m[1]) : null; }
+  return null;
+}
+function parseAmountAny(s) {
+  s = String(s ?? '').trim(); if (!s) return null;
+  const neg = /^\(.*\)$/.test(s) || /\bDR\b/i.test(s) || /-/.test(s);
+  const digits = s.replace(/[^0-9.]/g, '');
+  if (!digits || !/\d/.test(digits)) return null;
+  const n = parseFloat(digits);
+  if (!isFinite(n)) return null;
+  return neg ? -n : n;
+}
+const isAmountCell = x => /^[-+(]?\s*[£$€]?\s*[-+]?[\d,]+(\.\d+)?\)?(\s*(CR|DR|GBP))?$/i.test(String(x || '').trim());
+/** Reduce a bank description to a stable payee key, e.g. "DIRECT DEBIT PAYMENT TO OCTOPUS ENERGY REF 123" → "octopus energy". */
+function payeeKey(s, words) {
+  let t = String(s || '').toLowerCase();
+  t = t.replace(/,?\s*\b(ref(erence)?|mandate( no)?|on \d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|via)\b.*$/, ' ');
+  t = t.replace(/\b(direct debit|standing order|faster payments?|bill payment|card payment|contactless|payment|paid|received|from|to|dd|so|bgc|bp|vis|visa|pos|cr|dr|fpi|fpo|tfr|chq|atm|ddr|d\/d|s\/o|ltd|limited|plc|uk|gb|london|www|com)\b/g, ' ');
+  t = t.replace(/\b[a-z]*\d[a-z\d]*\b/g, ' ');            // reference codes such as P1234ABC
+  t = t.replace(/[^a-z&]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return t.split(' ').filter(w => w.length > 1 || w === '&').slice(0, words || 3).join(' ');
+}
+const titleCase = s => String(s).toLowerCase().replace(/\b([a-z])/g, c => c.toUpperCase());
+
+function detectLayout(rows) {
+  let hi = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const r = rows[i].map(x => x.toLowerCase());
+    if (r.some(x => /date/.test(x)) && r.some(x => /amount|money|paid|debit|credit|value|balance/.test(x)) && !parseDateAny(rows[i][0])) { hi = i; break; }
+  }
+  if (hi === -1) {   // no header row (typical HSBC export: Date, Description, Amount[, Balance])
+    const first = Math.max(0, rows.findIndex(r => parseDateAny(r[0])));
+    const sample = rows.slice(first, first + 15);
+    const ncol = Math.max(0, ...sample.map(r => r.length));
+    const numeric = c => sample.filter(r => r[c]).length > 0 && sample.filter(r => r[c]).every(r => isAmountCell(r[c]));
+    let desc = -1, amount = -1;
+    for (let c = 1; c < ncol; c++) { if (desc < 0 && !numeric(c)) desc = c; else if (desc >= 0 && amount < 0 && numeric(c)) amount = c; }
+    if (amount < 0) for (let c = 1; c < ncol; c++) if (numeric(c)) { amount = c; break; }
+    return { start: first, header: Array.from({ length: ncol }, (_, i) => 'Column ' + (i + 1)), map: { date: 0, desc, amount, in: -1, out: -1, type: -1, cat: -1, flip: false }, bank: ncol <= 4 ? 'HSBC / no header' : 'CSV (no header)', headerless: true };
+  }
+  const h = rows[hi].map(x => x.toLowerCase().trim());
+  const find = (...res) => { for (const re of res) { const i = h.findIndex(x => re.test(x)); if (i >= 0) return i; } return -1; };
+  const map = {
+    date: find(/^date$/, /^transaction date$/, /^posted/, /date/),
+    desc: find(/^name$/, /^description$/, /payee/, /merchant/, /narrative/, /details/, /description/, /^reference$/, /memo/),
+    amount: find(/^amount$/, /^value$/, /^amount \(gbp\)$/, /^amount(?!.*local)/),
+    in: find(/money in/, /paid in/, /^credit/, /^in$/, /credit amount/),
+    out: find(/money out/, /paid out/, /^debit/, /^out$/, /debit amount/),
+    type: find(/^type$/, /transaction type/),
+    cat: find(/^category$/),
+    flip: false
+  };
+  if (map.amount >= 0) { map.in = -1; map.out = -1; }
+  const bank = (h.includes('emoji') || (h.includes('transaction id') && h.includes('name'))) ? 'Monzo'
+    : (map.in >= 0 && map.out >= 0) ? 'Santander / money in–out CSV' : 'Bank CSV';
+  return { start: hi + 1, header: rows[hi], map, bank, headerless: false };
+}
+function buildTxns(f) {
+  const m = f.map, out = [];
+  const col = (r, i) => (i >= 0 && i < r.length) ? r[i] : '';
+  for (let i = f.start; i < f.rows.length; i++) {
+    const r = f.rows[i];
+    const date = parseDateAny(col(r, m.date)); if (!date) continue;
+    let amt;
+    if (m.amount >= 0) amt = parseAmountAny(col(r, m.amount));
+    else {
+      const a = parseAmountAny(col(r, m.in)), b = parseAmountAny(col(r, m.out));
+      if (a === null && b === null) continue;
+      amt = (a ? Math.abs(a) : 0) - (b ? Math.abs(b) : 0);
+    }
+    if (amt === null || !amt) continue;
+    if (m.flip) amt = -amt;
+    out.push({ date, amount: amt, desc: String(col(r, m.desc)).trim(), type: String(col(r, m.type)), cat: String(col(r, m.cat)), account: f.label });
+  }
+  f.txns = out;
+  return out;
+}
+
+const OUT_RULES = [
+  [/mortgage|\brent\b|council tax|ground rent|service charge|lettings|housing assoc/, 'housing'],
+  [/octopus|british gas|\bedf\b|e\.?on|\bovo\b|scottish power|so energy|utility warehouse|water|thames|severn|anglian|united utilities|\bbt\b|sky digital|\bsky\b|virgin media|plusnet|talktalk|vodafone|\bee\b|\bo2\b|three|giffgaff|tv licen|hyperoptic|community fibre|energy/, 'utilities'],
+  [/insurance|insure|aviva|admiral|direct line|legal (&|and) general|\bl ?& ?g\b|\blv\b|hastings|churchill|\baxa\b|vitality|bupa|zurich|royal london|petplan|esure|policy|assurance/, 'insurance'],
+  [/dvla|vehicle tax|\btfl\b|trainline|lner|\brail\b|\bshell\b|\besso\b|texaco|\bfuel|petrol|parking|ringgo|paybyphone|car finance|\bpcp\b|\buber\b(?!.*eats)/, 'transport'],
+  [/tesco|sainsbury|asda|aldi|lidl|morrisons|ocado|waitrose|co-?op|iceland|m ?& ?s|marks|farmfoods|grocer/, 'food'],
+  [/nursery|childcare|childminder|school|tax-?free childcare|after school/, 'childcare'],
+  [/\bloan\b|credit card|amex|american express|barclaycard|capital one|mbna|klarna|clearpay|paypal credit|zopa|novuna|finance/, 'debt'],
+  [/netflix|spotify|disney|prime|apple|icloud|google|youtube|audible|now ?tv|xbox|playstation|nintendo|patreon|microsoft|adobe|dropbox|openai|chatgpt|subscription/, 'subscriptions'],
+  [/\bgym\b|puregym|the gym|david lloyd|nuffield|restaurant|deliveroo|just eat|uber eats|cinema|odeon|cineworld|\bpub\b|costa|starbucks|greggs/, 'leisure']
+];
+const MONZO_CATS = { bills: 'utilities', groceries: 'food', transport: 'transport', entertainment: 'leisure', eating_out: 'leisure', 'eating out': 'leisure', holidays: 'leisure', family: 'childcare', finances: 'debt', gifts: 'gifts' };
+function guessFinCat(dir, text, mcat) {
+  const F = fin(), t = String(text).toLowerCase();
+  const has = (L, id) => L.some(c => c.id === id);
+  if (dir === 'in') {
+    if (/child benefit|universal credit|tax credit/.test(t) && has(F.incomeCats, 'benefits')) return 'benefits';
+    if (/salary|wages|payroll|\bpay\b/.test(t) && has(F.incomeCats, 'salary')) return 'salary';
+    return 'inc_other';
+  }
+  for (const [re, id] of OUT_RULES) if (re.test(t) && has(F.outCats, id)) return id;
+  const mc = MONZO_CATS[String(mcat || '').toLowerCase()];
+  if (mc && has(F.outCats, mc)) return mc;
+  return 'out_other';
+}
+function classifyInterval(d) {
+  if (d >= 5 && d <= 9) return { freq: 'monthly', mult: 52 / 12, label: 'weekly', tol: [5, 9] };
+  if (d >= 12 && d <= 17) return { freq: 'monthly', mult: 26 / 12, label: 'fortnightly', tol: [11, 18] };
+  if (d >= 24 && d <= 36) return { freq: 'monthly', mult: 1, label: 'monthly', tol: [20, 40] };
+  if (d >= 80 && d <= 100) return { freq: 'yearly', mult: 4, label: 'quarterly', tol: [75, 105] };
+  if (d >= 170 && d <= 200) return { freq: 'yearly', mult: 2, label: 'six-monthly', tol: [160, 210] };
+  if (d >= 340 && d <= 390) return { freq: 'yearly', mult: 1, label: 'yearly', tol: [330, 400] };
+  return null;
+}
+const median = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+const dayDiff = (a, b) => Math.round((parseYMD(b) - parseYMD(a)) / 864e5);
+function bestName(list, key) {
+  const counts = {};
+  list.forEach(t => { const d = t.desc.replace(/\s+/g, ' ').trim(); if (d) counts[d] = (counts[d] || 0) + 1; });
+  const top = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || [''])[0];
+  if (top && top !== top.toUpperCase() && top.length <= 32 && !/\d{4,}/.test(top)) return top;   // tidy mixed-case names (e.g. Monzo)
+  return titleCase(payeeKey(top, 5) || key);                                                       // clean up BANK STYLE TEXT
+}
+
+/** Group transactions by payee + direction + account, then look for a repeating interval and steady amount. */
+function analyseCsv() {
+  const S = csvSession; if (!S) return;
+  S.files.forEach(f => { if (!f.error) buildTxns(f); });
+  const all = S.files.flatMap(f => f.txns || []);
+  S.txCount = all.length; S.sugs = [];
+  if (!all.length) return;
+  const dates = all.map(t => t.date).sort();
+  S.from = dates[0]; S.to = dates[dates.length - 1];
+  const span = Math.max(1, dayDiff(S.from, S.to));
+  const groups = new Map();
+  all.forEach(t => {
+    if (/pot transfer|flex/i.test(t.type)) return;          // Monzo pot moves are never bills
+    const dir = t.amount < 0 ? 'out' : 'in';
+    const key = payeeKey(t.desc); if (!key) return;
+    const k = dir + '|' + key + '|' + t.account;
+    if (!groups.has(k)) groups.set(k, { dir, key, account: t.account, list: [] });
+    groups.get(k).list.push(t);
+  });
+  const keyMatch = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a)));
+  const existingOut = finOutgoings().map(o => payeeKey(o.name)).filter(Boolean);
+  const existingIn = fin().incomes.map(o => payeeKey(o.name)).filter(Boolean);
+  groups.forEach(g => {
+    const list = g.list.sort((a, b) => a.date < b.date ? -1 : 1);
+    const amts = list.map(t => Math.abs(t.amount));
+    const udates = [...new Set(list.map(t => t.date))];
+    const intervals = udates.slice(1).map((d, i) => dayDiff(udates[i], d));
+    const last = udates[udates.length - 1];
+    const text = list.map(t => t.desc + ' ' + t.type).join(' ');
+    const isMandate = /direct debit|standing order|\bdd\b|\bso\b|d\/d|s\/o/i.test(text);
+    const isTransfer = /\b(transfer|tfr|pot|savings?|isa|own account|monzo|santander|hsbc|round ?ups?)\b/i.test(list[0].desc);
+    const mean = amts.reduce((a, b) => a + b, 0) / amts.length;
+    const cv = mean ? Math.sqrt(amts.reduce((a, b) => a + (b - mean) ** 2, 0) / amts.length) / mean : 0;
+    const baseAmt = median(amts.slice(-3));
+    let s = null;
+    if (udates.length >= 2) {
+      const med = median(intervals), cls = classifyInterval(med);
+      if (cls) {
+        const regular = intervals.filter(d => d >= cls.tol[0] && d <= cls.tol[1]).length / intervals.length;
+        if (regular >= 0.5) {
+          let conf = ((udates.length >= 3 && regular >= 0.8 && cv < 0.2) || (isMandate && regular >= 0.8)) ? 'high' : regular >= 0.65 ? 'medium' : 'low';
+          const stopped = dayDiff(last, S.to) > med * 1.6 + 7;
+          if (stopped) conf = 'low';
+          s = { kind: 'regular', freq: cls.freq, amount: baseAmt * cls.mult, intervalLabel: cls.label, interval: Math.round(med), conf, stopped };
+        }
+      }
+      if (!s && g.dir === 'out' && list.length >= 4 && span >= 45) {
+        s = { kind: 'variable', freq: 'monthly', amount: amts.reduce((a, b) => a + b, 0) / Math.max(1, span / 30.44), intervalLabel: 'varies', conf: 'low' };
+      }
+    } else if (g.dir === 'out' && isMandate) {
+      s = { kind: 'once', freq: 'yearly', amount: amts[0], intervalLabel: 'seen once', conf: 'low' };
+    }
+    if (!s) return;
+    Object.assign(s, { dir: g.dir, key: g.key, account: g.account, name: bestName(list, g.key), count: list.length, first: udates[0], last,
+      min: Math.min(...amts), max: Math.max(...amts), mandate: isMandate, transfer: isTransfer });
+    const mcat = (list.find(t => t.cat) || {}).cat || '';
+    s.categoryId = g.dir === 'in'
+      ? (s.freq === 'monthly' && s.amount >= 500 && fin().incomeCats.some(c => c.id === 'salary') && !isTransfer ? 'salary' : guessFinCat('in', text, mcat))
+      : guessFinCat('out', text, mcat);
+    s.type = g.dir === 'out' ? ((fin().outCats.find(c => c.id === s.categoryId) || {}).essential === false ? 'discretionary' : 'essential') : '';
+    s.tracked = (g.dir === 'out' ? existingOut : existingIn).some(k => keyMatch(k, g.key));
+    if (g.dir === 'out') {
+      const words = g.key.split(' ');
+      const v = state.vault.find(v => { const pw = payeeKey(v.provider).split(' ')[0]; return pw && pw.length >= 3 && words.includes(pw); });
+      if (v) { if (v.inBudget) s.tracked = true; else { s.vaultId = v.id; s.vaultName = v.provider + (v.name ? ' – ' + v.name : ''); } }
+    }
+    s.checked = !s.tracked && !s.transfer && s.kind === 'regular' && s.conf !== 'low';
+    S.sugs.push(s);
+  });
+  const rank = { high: 0, medium: 1, low: 2 }, kr = { regular: 0, once: 1, variable: 2 };
+  S.sugs.sort((a, b) => (a.dir === b.dir ? 0 : a.dir === 'in' ? -1 : 1) || kr[a.kind] - kr[b.kind] || rank[a.conf] - rank[b.conf] || b.amount - a.amount);
+}
+
+async function loadCsvFiles(fileList) {
+  const files = Array.from(fileList || []); if (!files.length) return;
+  const read = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error || new Error('read failed')); r.readAsText(f); });
+  if (!csvSession) csvSession = { files: [], sugs: [] };
+  for (const file of files) {
+    const entry = { name: file.name };
+    try {
+      const text = await read(file);
+      if (/^\s*Date\s*:/mi.test(text) && /^\s*Amount\s*:/mi.test(text)) {
+        const rows = parseSantanderTxt(text);
+        Object.assign(entry, { rows, start: 1, header: rows[0], map: { date: 0, desc: 1, amount: 2, in: -1, out: -1, type: -1, cat: -1, flip: false }, bank: 'Santander', headerless: false, sig: 'santander-txt' });
+      } else {
+        const rows = parseCSVText(text);
+        if (!rows.length) throw new Error('the file is empty');
+        Object.assign(entry, { rows }, detectLayout(rows));
+        entry.sig = entry.headerless ? 'headerless:' + entry.header.length : entry.header.map(x => x.toLowerCase()).join('|');
+        const saved = fin().csvProfiles[entry.sig];
+        if (saved) entry.map = Object.assign({}, entry.map, saved);
+      }
+      const base = entry.bank.split(/[ /]/)[0];
+      const same = csvSession.files.filter(f => f.label && f.label.startsWith(base)).length;
+      entry.label = same ? `${base} ${same + 1}` : base;
+    } catch (e) {
+      entry.error = 'Could not read this file: ' + (e.message || e);
+      entry.label = file.name;
+    }
+    csvSession.files.push(entry);
+  }
+  if (!appBooted || !csvSession) return;   // signed out while reading
+  analyseCsv();
+  render();
 }
 
 /* ========================= 8. BACKUP / SHARE ========================= */
@@ -1485,6 +2386,8 @@ function applyImport(mode) {
     state.checklists = mergeArrays(state.checklists, inc.checklists);
     state.people = mergeArrays(state.people, inc.people);
     state.vault = mergeArrays(state.vault, inc.vault);
+    state.vaultCats = mergeArrays(state.vaultCats, inc.vaultCats);
+    ['incomes', 'outgoings', 'pots', 'incomeCats', 'outCats'].forEach(k => { state.finance[k] = mergeArrays(state.finance[k], inc.finance[k]); });
     if (inc.christmas.year === state.christmas.year) {
       state.christmas.recipients = mergeArrays(state.christmas.recipients, inc.christmas.recipients);
       if (!state.christmas.budget) state.christmas.budget = inc.christmas.budget;
@@ -1719,6 +2622,71 @@ const ACTIONS = {
   'vault-cat': el => { ui.vaultCat = el.dataset.val; render(); },
   'copy': el => { const v = el.dataset.val; (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => toast('Copied to clipboard')).catch(() => toast('Copy not available – select the text manually', 'error')); },
 
+
+  /* Vault categories */
+  'vault-cats': () => vaultCatsModal(),
+  'vcat-new': () => vaultCatForm(),
+  'vcat-edit': el => vaultCatForm(el.dataset.id),
+  'vcat-move': el => {
+    const L = state.vaultCats, i = L.findIndex(c => c.id === el.dataset.id), j = i + Number(el.dataset.val);
+    if (i < 0 || j < 0 || j >= L.length) return;
+    [L[i], L[j]] = [L[j], L[i]]; commit(); vaultCatsModal();
+  },
+  'vcat-delete': el => {
+    const c = vcats().find(x => x.id === el.dataset.id); if (!c || c.id === 'other') return;
+    const n = state.vault.filter(v => v.category === c.id).length;
+    confirmModal(`Delete the “${esc(c.label)}” category?${n ? ` Its ${n} entr${n === 1 ? 'y' : 'ies'} will move to “Other”.` : ''}`, () => {
+      state.vault.forEach(v => { if (v.category === c.id) { v.category = 'other'; touch(v); } });
+      state.vaultCats = state.vaultCats.filter(x => x.id !== c.id);
+      if (ui.vaultCat === c.id) ui.vaultCat = 'all';
+      commit(); vaultCatsModal();
+    });
+  },
+
+  /* Finance planner */
+  'fin-tab': el => { ui.finTab = el.dataset.val; if (route() !== 'finance') location.hash = '#/finance'; else { render(); window.scrollTo({ top: 0 }); } },
+  'fin-out-filter': el => { ui.finOutFilter = el.dataset.val; render(); },
+  'fin-add-income': () => finItemForm('income'),
+  'fin-edit-income': el => finItemForm('income', el.dataset.id),
+  'fin-del-income': el => confirmModal('Delete this income?', () => { fin().incomes = fin().incomes.filter(x => x.id !== el.dataset.id); commit(); }),
+  'fin-add-out': () => finItemForm('out'),
+  'fin-edit-out': el => { const id = el.dataset.id; if (id.startsWith('v_')) vaultForm(id.slice(2)); else finItemForm('out', id); },
+  'fin-del-out': el => {
+    const id = el.dataset.id;
+    if (id.startsWith('v_')) {
+      const v = byId(state.vault, id.slice(2)); if (!v) return;
+      confirmModal(`Remove “${esc(v.provider)}” from the budget? The vault entry itself is kept.`, () => { v.inBudget = false; touch(v); commit(); }, { yesLabel: 'Remove from budget' });
+    } else confirmModal('Delete this outgoing?', () => { fin().outgoings = fin().outgoings.filter(x => x.id !== id); commit(); });
+  },
+  'fin-cats': el => finCatsModal(el.dataset.val === 'income' ? 'income' : 'out'),
+  'fincat-edit': el => finCatEditForm(el.dataset.kind, el.dataset.id),
+  'fincat-move': el => {
+    const L = el.dataset.kind === 'income' ? fin().incomeCats : fin().outCats;
+    const i = L.findIndex(c => c.id === el.dataset.id), j = i + Number(el.dataset.val);
+    if (i < 0 || j < 0 || j >= L.length) return;
+    [L[i], L[j]] = [L[j], L[i]]; commit(); finCatsModal(el.dataset.kind);
+  },
+  'fincat-del': el => {
+    const kind = el.dataset.kind, id = el.dataset.id;
+    const fb = kind === 'income' ? 'inc_other' : 'out_other'; if (id === fb) return;
+    const L = kind === 'income' ? fin().incomeCats : fin().outCats;
+    const c = L.find(x => x.id === id); if (!c) return;
+    confirmModal(`Delete the “${esc(c.label)}” category? Items in it move to “${esc(finCat(kind, fb).label)}”.`, () => {
+      const F = fin();
+      (kind === 'income' ? F.incomes : F.outgoings).forEach(o => { if (o.categoryId === id) { o.categoryId = fb; touch(o); } });
+      if (kind === 'out') state.vault.forEach(v => { if (v.finCat === id) { v.finCat = fb; touch(v); } });
+      if (kind === 'income') F.incomeCats = F.incomeCats.filter(x => x.id !== id); else F.outCats = F.outCats.filter(x => x.id !== id);
+      commit(); finCatsModal(kind);
+    });
+  },
+  'pot-new': () => potForm(),
+  'pot-edit': el => potForm(el.dataset.id),
+  'pot-del': el => confirmModal('Delete this savings pot?', () => { fin().pots = fin().pots.filter(x => x.id !== el.dataset.id); commit(); }),
+  'billspot-edit': () => billsPotForm(),
+  'csv-remove': el => { if (!csvSession) return; csvSession.files.splice(Number(el.dataset.val), 1); if (!csvSession.files.length) csvSession = null; else analyseCsv(); render(); },
+  'csv-clear': () => { csvSession = null; render(); toast('Statement data cleared'); },
+  'csv-sel': el => $$('#view input[name=pick]').forEach(c => { c.checked = el.dataset.val === 'all'; }),
+
   /* Backup & data */
   'export-json': () => exportJSON(),
   'share-json': () => shareJSON(),
@@ -1753,6 +2721,31 @@ const ACTIONS = {
 };
 
 const FORMS = {
+  'csv-apply': fd => {
+    const S = csvSession; if (!S) return;
+    const picks = fd.getAll('pick').map(Number);
+    if (!picks.length) { toast('Tick at least one suggestion', 'error'); return; }
+    let nIn = 0, nOut = 0, nLink = 0;
+    picks.forEach(i => {
+      const s = S.sugs[i]; if (!s) return;
+      const name = String(fd.get('name_' + i) || s.name).trim() || s.name;
+      const amount = num(fd.get('amount_' + i));
+      const frequency = fd.get('freq_' + i) === 'yearly' ? 'yearly' : 'monthly';
+      const categoryId = fd.get('cat_' + i) || (s.dir === 'in' ? 'inc_other' : 'out_other');
+      if (amount <= 0) return;
+      if (s.dir === 'in') { fin().incomes.push(touch({ id: uid(), name, amount, frequency, categoryId, notes: 'Found from bank statement' })); nIn++; return; }
+      const type = fd.get('type_' + i) === 'discretionary' ? 'discretionary' : 'essential';
+      const v = s.vaultId && fd.get('link_' + i) === 'on' ? byId(state.vault, s.vaultId) : null;
+      if (v) { v.inBudget = true; v.finCat = categoryId; v.finType = type; touch(v); nLink++; return; }
+      fin().outgoings.push(touch({ id: uid(), name, amount, frequency, categoryId, type, dueDate: frequency === 'yearly' ? (nextAnnual(s.last) || '') : '',
+        notes: s.kind === 'variable' ? 'Average from bank statement' : 'Found from bank statement' }));
+      nOut++;
+    });
+    csvSession = null;                       // statement data is discarded once used
+    ui.finTab = nIn && !nOut && !nLink ? 'income' : 'outgoings';
+    commit(); window.scrollTo({ top: 0 });
+    toast(`Added ${nIn + nOut} item${nIn + nOut === 1 ? '' : 's'}${nLink ? ` · linked ${nLink} vault entr${nLink === 1 ? 'y' : 'ies'}` : ''}`);
+  },
   'task-quick': (fd, form) => {
     const title = String(fd.get('title') || '').trim(); if (!title) return;
     state.tasks.push(touch({ id: uid(), title, due: fd.get('due') || '', priority: fd.get('priority') || 'medium', category: fd.get('category') || 'general', notes: '', done: false }));
@@ -1815,6 +2808,20 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (!appBooted) return;
   if (el.id === 'import-file' && el.files && el.files[0]) { closeModal(); handleImportFile(el.files[0]); return; }
+  if (el.id === 'csv-input' && el.files && el.files.length) { loadCsvFiles(el.files); return; }
+  if (el.dataset.change === 'csv-map' && csvSession) {
+    const f = csvSession.files[Number(el.dataset.file)]; if (!f) return;
+    if (el.dataset.key === 'flip') f.map.flip = el.checked; else f.map[el.dataset.key] = Number(el.value);
+    if (el.dataset.key === 'amount' && f.map.amount >= 0) { f.map.in = -1; f.map.out = -1; }
+    if ((el.dataset.key === 'in' || el.dataset.key === 'out') && Number(el.value) >= 0) f.map.amount = -1;
+    if (f.sig) { fin().csvProfiles[f.sig] = { ...f.map }; save(); }   // remember layout only – never transactions
+    analyseCsv(); render(); return;
+  }
+  if (el.dataset.change === 'pot-value' || el.dataset.change === 'pot-mode') {
+    const p = byId(fin().pots, el.dataset.id); if (!p) return;
+    if (el.dataset.change === 'pot-value') p.value = num(el.value); else p.mode = el.value === 'percent' ? 'percent' : 'fixed';
+    touch(p); commit(); return;
+  }
   if (el.dataset.change === 'xmas-gift-status') {
     const r = byId(state.christmas.recipients, el.dataset.id); const g = r && byId(r.gifts, el.dataset.item);
     if (!g) return; g.status = el.value; touch(r); commit();
@@ -1835,6 +2842,7 @@ let focusAfterRender = null, renderDeferred = false, appBooted = false;
 const route = () => { const r = (location.hash.match(/^#\/(\w+)/) || [])[1]; return TITLES[r] ? r : 'dashboard'; };
 
 function renderNav(r) {
+  if (r === 'tools' || r === 'finance') r = 'settings';   // hidden tools live under Settings
   $('#side-nav').innerHTML = NAV.map(n => `
     <a href="#/${n.id}" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${r === n.id ? 'bg-teal-50 text-teal-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}">
       ${icon(n.icon, 'w-5 h-5 ' + (r === n.id ? 'text-teal-600' : 'text-slate-400'))}${n.label}</a>`).join('');
@@ -1843,7 +2851,7 @@ function renderNav(r) {
       <span class="w-12 h-7 rounded-full flex items-center justify-center ${r === n.id ? 'bg-teal-50' : ''}">${icon(n.icon, 'w-5 h-5')}</span>${n.label}</a>`).join('');
 }
 
-const VIEWS = { dashboard: renderDashboard, tasks: renderTasks, birthdays: renderBirthdays, christmas: renderChristmas, vault: renderVault, settings: renderSettings };
+const VIEWS = { dashboard: renderDashboard, tasks: renderTasks, birthdays: renderBirthdays, christmas: renderChristmas, vault: renderVault, settings: renderSettings, tools: renderTools, finance: renderFinance };
 
 function render() {
   renderDeferred = false;
@@ -1866,7 +2874,7 @@ function scheduleRender() {
 }
 document.addEventListener('focusout', () => { if (appBooted && renderDeferred) setTimeout(() => { if (renderDeferred) scheduleRender(); }, 50); });
 
-window.addEventListener('hashchange', () => { if (!appBooted) return; if (checkSyncLink()) return; render(); window.scrollTo({ top: 0 }); });
+window.addEventListener('hashchange', () => { if (!appBooted) return; if (checkSyncLink()) return; if (route() !== 'finance') csvSession = null; render(); window.scrollTo({ top: 0 }); });
 document.addEventListener('visibilitychange', () => {
   if (!appBooted || document.visibilityState !== 'visible') return;
   if (Sync.enabled()) Sync.pull(); else ensureCycles();
@@ -1944,6 +2952,7 @@ function lockApp() {
   closeModal();
   appBooted = false; renderDeferred = false;
   state = undefined;                               // drop data from memory
+  csvSession = null;
   $('#view').innerHTML = '';
   showShell(false);
 }
