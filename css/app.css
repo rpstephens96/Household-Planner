@@ -1,0 +1,16 @@
+    html { -webkit-tap-highlight-color: transparent; }
+    body { overscroll-behavior-y: none; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    @keyframes slideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .anim-up { animation: slideUp .22s ease-out; }
+    .anim-fade { animation: fadeIn .18s ease-out; }
+    details > summary { list-style: none; cursor: pointer; }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] .chev { transform: rotate(180deg); }
+    i[data-lucide] { display: inline-block; }
+    code { font-size: 12px; }
+    /* Auth gate must work even if the Tailwind CDN fails to load */
+    #app-shell.hidden, #auth-gate.hidden { display: none !important; }
