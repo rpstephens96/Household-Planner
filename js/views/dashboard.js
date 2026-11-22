@@ -16,7 +16,7 @@ function taskRow(t) {
       class="mt-0.5 shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${t.done ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300 hover:border-teal-500 text-transparent hover:text-teal-400'}">${icon('check', 'w-3.5 h-3.5')}</button>
     <div class="flex-1 min-w-0">
       <p class="text-sm ${t.done ? 'line-through text-slate-400' : 'text-slate-800 font-medium'} break-words">${esc(t.title)}</p>
-      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">${pill(p.label, p.cls)}<span class="text-xs text-slate-500">${TASK_CATS[t.category] || 'General'}</span>${due}</div>
+      <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">${pill(p.label, p.cls)}<span class="text-xs text-slate-500">${esc((taskCategories().find(([id]) => id === t.category) || ['general', 'General'])[1])}</span>${due}</div>
       ${t.notes ? `<p class="text-xs text-slate-500 mt-1 break-words">${esc(t.notes)}</p>` : ''}
     </div>
     <div class="flex shrink-0 -mr-2">
@@ -58,9 +58,10 @@ function renderDashboard() {
   const dueToday = open.filter(x => x.due === t);
   const focus = [...overdue, ...dueToday].sort(sortTasks);
 
-  const bdays = state.people.filter(p => p.dob).map(p => ({ p, nb: nextBirthday(p) })).filter(o => o.nb.days <= 30).sort((a, b) => a.nb.days - b.nb.days);
+  const birthdayDays = lookAhead(30), renewalDays = lookAhead(60);
+  const bdays = state.people.filter(p => p.dob).map(p => ({ p, nb: nextBirthday(p) })).filter(o => o.nb.days <= birthdayDays).sort((a, b) => a.nb.days - b.nb.days);
   const bdayMissing = bdays.filter(o => !o.p.finalGift || o.p.finalGift.status === 'idea' || !o.p.cardBought || !o.p.cardSent).length;
-  const renewals = state.vault.filter(v => v.renewalDate).map(v => ({ v, d: daysUntil(v.renewalDate) })).filter(o => o.d <= 60 && o.d >= -30).sort((a, b) => a.d - b.d);
+  const renewals = state.vault.filter(v => v.renewalDate).map(v => ({ v, d: daysUntil(v.renewalDate) })).filter(o => o.d <= renewalDays && o.d >= -30).sort((a, b) => a.d - b.d);
   const xs = xmasStats();
   const h = new Date().getHours();
   const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -81,8 +82,8 @@ function renderDashboard() {
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
     ${statTile('tasks', 'calendar-check', dueToday.length, 'Tasks due today', 'bg-teal-50 text-teal-600')}
     ${statTile('tasks', 'triangle-alert', overdue.length, 'Overdue tasks', overdue.length ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500')}
-    ${statTile('birthdays', 'cake', bdays.length, 'Birthdays · next 30 days', 'bg-violet-50 text-violet-600')}
-    ${statTile('vault', 'shield-check', renewals.length, 'Renewals · next 60 days', renewals.some(r => r.d < 14) ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600')}
+    ${statTile('birthdays', 'cake', bdays.length, `Birthdays · next ${birthdayDays} days`, 'bg-violet-50 text-violet-600')}
+    ${statTile('vault', 'shield-check', renewals.length, `Renewals · next ${renewalDays} days`, renewals.some(r => r.d < 14) ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600')}
   </div>
 
   <div class="grid lg:grid-cols-2 gap-4">
@@ -111,13 +112,13 @@ function renderDashboard() {
             <p class="text-xs text-slate-500">${fmtDate(nb.date, { weekday: 'short', day: 'numeric', month: 'short' })}${nb.turning !== null ? ` · turning ${nb.turning}` : ''}</p>
             <div class="flex flex-wrap gap-1.5 mt-1.5">${giftStatusPill(p)}${cardStatusPill(p)}</div>
           </div></a></li>`).join('')}</ul>`
-        : emptyBox('cake', 'No birthdays in the next 30 days', '')}
+        : emptyBox('cake', `No birthdays in the next ${birthdayDays} days`, '')}
     </section>
 
     <!-- Renewals -->
     <section class="${CARD} p-5">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('shield-check', 'w-5 h-5 text-amber-600')} Renewals due (60 days)</h3>
+        <h3 class="font-semibold text-slate-900 flex items-center gap-2">${icon('shield-check', 'w-5 h-5 text-amber-600')} Renewals due (${renewalDays} days)</h3>
         <a href="#/vault" class="text-sm text-teal-700 hover:underline">Open vault</a>
       </div>
       ${renewals.length ? `<ul class="space-y-2">${renewals.map(({ v }) => { const c = vcat(v.category); return `
@@ -127,7 +128,7 @@ function renderDashboard() {
           <p class="text-xs text-slate-500">${fmtDate(v.renewalDate)} · ${v.autoRenew ? 'Auto-renews' : '<span class="text-rose-600 font-medium">Does NOT auto-renew</span>'}</p></div>
           ${renewalBadge(v.renewalDate)}
         </li>`; }).join('')}</ul>`
-        : emptyBox('shield-check', 'No renewals in the next 60 days', '')}
+        : emptyBox('shield-check', `No renewals in the next ${renewalDays} days`, '')}
     </section>
 
     <!-- Christmas -->
@@ -162,4 +163,3 @@ function renderDashboard() {
     </section>` : ''}
   </div>`;
 }
-

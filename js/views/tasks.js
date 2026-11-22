@@ -33,13 +33,14 @@ function renderTaskList() {
     <div class="grid grid-cols-3 gap-2 mt-2">
       <input type="date" name="due" class="${INPUT} !py-2" aria-label="Due date">
       ${sel('priority', Object.entries(PRIORITIES).map(([k, v]) => [k, v.label + ' priority']), 'medium').replace(INPUT, INPUT + ' !py-2')}
-      ${sel('category', Object.entries(TASK_CATS), 'general').replace(INPUT, INPUT + ' !py-2')}
+      ${sel('category', taskCategories(), 'general').replace(INPUT, INPUT + ' !py-2')}
     </div>
   </form>
 
   <div class="space-y-2 mb-4">
     ${filterPills([['open', 'Open', count('open')], ['today', 'Today', count('today')], ['overdue', 'Overdue', count('overdue')], ['upcoming', 'Upcoming', count('upcoming')], ['done', 'Completed', count('done')], ['all', 'All', count('all')]], ui.taskFilter, 'task-filter')}
-    ${filterPills([['all', 'All categories'], ...Object.entries(TASK_CATS)], ui.taskCat, 'task-cat')}
+    ${filterPills([['all', 'All categories'], ...taskCategories().map(([id, label]) => [esc(id), esc(label)])], ui.taskCat, 'task-cat')}
+    <button type="button" data-action="task-cat-new" class="${BTN_GHOST} !py-1.5 !text-xs">${icon('plus')}Add category</button>
   </div>
 
   <section class="${CARD} px-4 md:px-5">
@@ -78,12 +79,14 @@ function checklistCard(c) {
     </button>
     ${collapsed ? '' : `
     <div class="px-4 md:px-5 pb-4">
-      <ul class="space-y-1">${c.items.map(i => `
+      <ul class="space-y-1">${c.items.map((i, index) => `
         <li class="flex items-center gap-2 group">
           <button type="button" data-action="cl-toggle-item" data-id="${c.id}" data-item="${i.id}" class="flex-1 flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 text-left">
             <span class="w-5 h-5 shrink-0 rounded-md border-2 flex items-center justify-center ${i.done ? 'bg-sky-500 border-sky-500 text-white' : 'border-slate-300 text-transparent'}">${icon('check', 'w-3 h-3')}</span>
             <span class="text-sm ${i.done ? 'line-through text-slate-400' : 'text-slate-700'} break-words">${esc(i.text)}</span>
           </button>
+          <button type="button" data-action="cl-move-item" data-id="${c.id}" data-item="${i.id}" data-val="-1" class="${ICON_BTN} !w-8 !h-8" aria-label="Move ${esc(i.text)} up" ${index === 0 ? 'disabled' : ''}>${icon('chevron-up', 'w-3.5 h-3.5')}</button>
+          <button type="button" data-action="cl-move-item" data-id="${c.id}" data-item="${i.id}" data-val="1" class="${ICON_BTN} !w-8 !h-8" aria-label="Move ${esc(i.text)} down" ${index === c.items.length - 1 ? 'disabled' : ''}>${icon('chevron-down', 'w-3.5 h-3.5')}</button>
           <button type="button" data-action="cl-del-item" data-id="${c.id}" data-item="${i.id}" class="${ICON_BTN} !w-8 !h-8" aria-label="Remove item">${icon('x', 'w-3.5 h-3.5')}</button>
         </li>`).join('')}</ul>
       <form data-form="cl-add-item" data-id="${c.id}" class="flex gap-2 mt-2">
@@ -99,4 +102,3 @@ function checklistCard(c) {
     </div>`}
   </section>`;
 }
-

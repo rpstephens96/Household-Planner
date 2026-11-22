@@ -52,13 +52,14 @@ function vaultCard(v) {
 function renderVault() {
   const V = state.vault;
   const monthlyTotal = sum(V, v => v.costPeriod === 'monthly' ? num(v.cost) : num(v.cost) / 12);
-  const soon = V.filter(v => { const d = daysUntil(v.renewalDate); return d !== null && d < 60; }).length;
+  const days = lookAhead(60);
+  const soon = V.filter(v => { const d = daysUntil(v.renewalDate); return d !== null && d <= days; }).length;
   const noLoc = V.filter(v => !v.location).length;
   return `
   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
     <div class="${CARD} p-4"><p class="text-xs text-slate-500">Entries</p><p class="text-2xl font-bold text-slate-900 mt-1">${V.length}</p></div>
     <div class="${CARD} p-4"><p class="text-xs text-slate-500">Monthly outgoings</p><p class="text-2xl font-bold text-slate-900 mt-1">${money(monthlyTotal)}</p><p class="text-xs text-slate-500">${money(monthlyTotal * 12)} a year</p></div>
-    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Renewing within 60 days</p><p class="text-2xl font-bold ${soon ? 'text-amber-600' : 'text-slate-900'} mt-1">${soon}</p></div>
+    <div class="${CARD} p-4"><p class="text-xs text-slate-500">Overdue or renewing within ${days} days</p><p class="text-2xl font-bold ${soon ? 'text-amber-600' : 'text-slate-900'} mt-1">${soon}</p></div>
     <div class="${CARD} p-4"><p class="text-xs text-slate-500">Missing "where to find it"</p><p class="text-2xl font-bold ${noLoc ? 'text-rose-600' : 'text-emerald-600'} mt-1">${noLoc}</p></div>
   </div>
   <div class="flex flex-col sm:flex-row gap-2 mb-3">
@@ -70,4 +71,3 @@ function renderVault() {
   <div class="mb-5">${filterPills([['all', 'All', V.length], ...vcats().map(c => [c.id, c.label, V.filter(v => vcat(v.category).id === c.id).length])], ui.vaultCat, 'vault-cat')}</div>
   <div id="vault-list">${vaultListHTML()}</div>`;
 }
-

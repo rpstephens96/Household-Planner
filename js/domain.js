@@ -35,7 +35,9 @@ function ensureCycles() {
   if (changed) save();
 }
 
-const recipientDone = r => r.gifts.length > 0 && r.gifts.every(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX);
+const recipientDone = r => r.complete === true;
+const taskCategories = () => [...Object.entries(TASK_CATS), ...state.taskCats.map(c => [c.id, c.label])];
+const lookAhead = fallback => state.lookAheadDays === null ? fallback : state.lookAheadDays;
 const recipientSpent = r => sum(r.gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX), g => num(g.price));
 function xmasStats() {
   const c = state.christmas, R = c.recipients;
@@ -126,4 +128,3 @@ function sortTasks(a, b) {
   if (ad !== bd) return ad < bd ? -1 : 1;
   return (PRIORITIES[a.priority]?.rank ?? 1) - (PRIORITIES[b.priority]?.rank ?? 1);
 }
-

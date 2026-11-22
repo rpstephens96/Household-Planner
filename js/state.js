@@ -4,6 +4,8 @@ function defaultState() {
   return {
     version: 1,
     tasks: [],
+    taskCats: [],
+    lookAheadDays: null,
     checklists: [],
     people: [],
     christmas: { year: new Date().getFullYear(), budget: 0, recipients: [], archive: [] },
@@ -94,7 +96,7 @@ let state;
 let ui = {
   taskFilter: 'open', taskCat: 'all', tasksTab: 'tasks',
   clCollapsed: {}, personOpen: {},
-  xmasFilter: 'all', vaultCat: 'all', vaultSearch: '',
+  xmasFilter: 'all', xmasOpen: {}, vaultCat: 'all', vaultSearch: '',
   finTab: 'overview', finOutFilter: 'all'
 };
 
@@ -103,6 +105,8 @@ function normalise(raw) {
   const d = defaultState();
   const s = Object.assign(d, raw || {});
   s.tasks = Array.isArray(s.tasks) ? s.tasks : [];
+  s.taskCats = (Array.isArray(s.taskCats) ? s.taskCats : []).filter(c => c && typeof c.id === 'string' && typeof c.label === 'string' && c.label.trim());
+  s.lookAheadDays = Number.isInteger(s.lookAheadDays) && s.lookAheadDays >= 1 && s.lookAheadDays <= 365 ? s.lookAheadDays : null;
   s.checklists = (Array.isArray(s.checklists) ? s.checklists : []).map(c => ({ items: [], ...c, items: Array.isArray(c.items) ? c.items : [] }));
   s.people = (Array.isArray(s.people) ? s.people : []).map(p => ({ ideas: [], history: [], finalGift: null, cardBought: false, cardSent: false, yearKnown: true, ...p,
     ideas: Array.isArray(p.ideas) ? p.ideas : [], history: Array.isArray(p.history) ? p.history : [] }));
@@ -158,4 +162,3 @@ function exportable() {
   const { settings, ...rest } = state;
   return clone(rest);
 }
-

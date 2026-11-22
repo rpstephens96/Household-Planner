@@ -92,6 +92,7 @@ function applyImport(mode) {
   } else {
     const inc = normalise(clone(data));
     state.tasks = mergeArrays(state.tasks, inc.tasks);
+    state.taskCats = mergeArrays(state.taskCats, inc.taskCats);
     state.checklists = mergeArrays(state.checklists, inc.checklists);
     state.people = mergeArrays(state.people, inc.people);
     state.vault = mergeArrays(state.vault, inc.vault);
@@ -106,4 +107,3 @@ function applyImport(mode) {
   closeModal(); commit();
   toast(mode === 'replace' ? 'Data replaced from backup' : 'Backup merged');
 }
-

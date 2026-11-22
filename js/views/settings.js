@@ -19,6 +19,13 @@ function renderSettings() {
   return `
   <div class="grid lg:grid-cols-2 gap-4 items-start">
     <section class="${CARD} p-5">
+      <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-2">${icon('calendar', 'w-5 h-5 text-violet-600')} Upcoming reminders</h3>
+      <form data-form="look-ahead" class="space-y-3">
+        ${field('Look ahead (days)', inp('days', state.lookAheadDays ?? '', 'type="number" min="1" max="365" step="1" required placeholder="e.g. 60"'), 'Applies to birthdays and renewals for the household. Until set, the original 30 and 60 day windows apply.')}
+        <button type="submit" class="${BTN_PRIMARY}">${icon('check')}Save reminder window</button>
+      </form>
+    </section>
+    <section class="${CARD} p-5">
       <h3 class="font-semibold text-slate-900 flex items-center gap-2 mb-3">${icon('user-round-check', 'w-5 h-5 text-teal-600')} Account</h3>
       <div class="flex items-center gap-3">
         ${Auth.user && Auth.user.photoURL ? `<img src="${esc(Auth.user.photoURL)}" alt="" referrerpolicy="no-referrer" class="w-10 h-10 rounded-full">` : `<div class="w-10 h-10 rounded-full ${avatarCls(Auth.email())} flex items-center justify-center text-sm font-semibold">${initials(Auth.user?.displayName || Auth.email())}</div>`}
@@ -75,4 +82,3 @@ function renderSettings() {
     </section>
   </div>`;
 }
-

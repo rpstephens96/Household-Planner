@@ -48,3 +48,22 @@ browser cache; changing the scheme, hostname, or port creates a different local
 storage origin. Export a JSON backup from the app before moving or redeploying.
 Cloud synchronisation must be configured with the same Firebase project and
 household ID to access the existing shared data.
+
+## Planning
+
+- Set one upcoming reminder window in Settings for birthday and renewal
+  summaries. Until a window is saved, the original 30-day birthday and 60-day
+  renewal windows remain in effect. The saved setting is shared with the
+  household and included in backups.
+- Add task categories from the Tasks page. Categories are shared and included
+  in backups.
+- Use the up and down buttons beside checklist items to change their order.
+- Christmas recipients start in progress; use **Mark complete** when you have
+  finished buying for someone. Expand a recipient to view or edit their gifts.
+  Existing recipients must also be marked complete manually; a purchased gift
+  no longer automatically marks someone complete. Completion is reset when
+  starting a new Christmas year.
+
+All gift ideas and gift history currently belong to the shared household data.
+Do not use the app to store gifts you need to keep private from another
+household member.

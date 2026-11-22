@@ -11,6 +11,7 @@ function renderBirthdays() {
   }).join('');
 
   return `
+  <p class="mb-3 text-xs text-slate-500">${icon('users', 'w-3.5 h-3.5 inline')} Gift ideas and history are shared with household members.</p>
   <div class="flex items-center justify-between gap-3 mb-2">
     <p class="text-sm text-slate-500">${state.people.length} ${state.people.length === 1 ? 'person' : 'people'} · sorted by next birthday</p>
     <button type="button" data-action="person-new" class="${BTN_PRIMARY}">${icon('user-plus')}Add person</button>
@@ -119,4 +120,3 @@ function personCard(p, nb) {
     </div>`}
   </article>`;
 }
-

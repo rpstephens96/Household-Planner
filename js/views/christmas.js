@@ -38,7 +38,8 @@ function renderChristmas() {
     <button type="button" data-action="xmas-import" class="${BTN_GHOST}">${icon('users')}Import from birthdays</button>
     <button type="button" data-action="xmas-new-year" class="${BTN_GHOST} sm:ml-auto">${icon('archive')}Start ${c.year + 1}</button>
   </div>
-  <div class="mb-4">${filterPills([['all', 'Everyone', R.length], ['todo', 'Still need to buy', R.filter(r => !recipientDone(r)).length], ['done', 'Completed', xs.done]], ui.xmasFilter, 'xmas-filter')}</div>
+  <p class="mb-3 text-xs text-slate-500">${icon('users', 'w-3.5 h-3.5 inline')} Gifts are shared with household members.</p>
+  <div class="mb-4">${filterPills([['all', 'Everyone', R.length], ['todo', 'In progress', R.filter(r => !recipientDone(r)).length], ['done', 'Completed', xs.done]], ui.xmasFilter, 'xmas-filter')}</div>
 
   ${filtered.length ? `<div class="grid md:grid-cols-2 gap-4 items-start">${filtered.map(recipientCard).join('')}</div>`
     : `<div class="${CARD}">${emptyBox('gift', R.length ? 'Nobody in this view' : 'No recipients yet', R.length ? '' : 'Import people from your birthday list or add Christmas-only recipients.')}</div>`}`;
@@ -64,7 +65,11 @@ function recipientCard(r) {
     <div class="mt-3">${progress(budget ? spent / budget * 100 : 0, budget && spent > budget ? 'bg-rose-500' : 'bg-emerald-500')}</div>
     ${budget && spent > budget ? `<p class="text-xs text-rose-600 mt-1">${money(spent - budget)} over target</p>` : ''}
     ${r.notes ? `<p class="text-xs text-slate-500 mt-2">${esc(r.notes)}</p>` : ''}
-
+    <div class="mt-3 flex flex-wrap gap-2">
+      <button type="button" data-action="xmas-toggle" data-id="${r.id}" aria-expanded="${!!ui.xmasOpen[r.id]}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon(ui.xmasOpen[r.id] ? 'chevron-up' : 'chevron-down')} ${ui.xmasOpen[r.id] ? 'Hide' : 'Show'} gifts (${r.gifts.length})</button>
+      <button type="button" data-action="xmas-complete" data-id="${r.id}" class="${BTN_GHOST} !py-1.5 !text-xs">${icon(done ? 'rotate-ccw' : 'check')} ${done ? 'Mark incomplete' : 'Mark complete'}</button>
+    </div>
+    ${ui.xmasOpen[r.id] ? `
     <ul class="mt-3 space-y-2">${r.gifts.map(g => { const url = safeUrl(g.link); return `
       <li class="rounded-xl bg-slate-50 p-2.5 flex flex-wrap items-center gap-2">
         <div class="flex-1 min-w-[8rem]">
@@ -81,6 +86,6 @@ function recipientCard(r) {
     <button type="button" data-action="xmas-gift-new" data-id="${r.id}" class="mt-2 w-full rounded-xl border-2 border-dashed border-slate-200 hover:border-teal-300 hover:bg-teal-50/50 text-sm text-slate-500 hover:text-teal-700 py-2 flex items-center justify-center gap-2 transition">${icon('plus')}Add gift</button>
     ${past.length ? `<details class="mt-3"><summary class="text-xs text-slate-500 flex items-center gap-1">${icon('history', 'w-3.5 h-3.5')} Previously given (avoid repeats)<span class="chev transition">${icon('chevron-down', 'w-3.5 h-3.5')}</span></summary>
       <ul class="mt-2 text-xs text-slate-600 space-y-1 pl-5 list-disc">${past.map(h => `<li>${esc(h.year)} ${esc(h.occasion || '')}: ${esc(h.gift)}</li>`).join('')}</ul></details>` : ''}
+    ` : ''}
   </article>`;
 }
-

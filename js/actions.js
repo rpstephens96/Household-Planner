@@ -19,6 +19,16 @@ const ACTIONS = {
   'task-delete': el => confirmModal('Delete this task?', () => { state.tasks = state.tasks.filter(x => x.id !== el.dataset.id); commit(); }),
   'task-filter': el => { ui.taskFilter = el.dataset.val; render(); },
   'task-cat': el => { ui.taskCat = el.dataset.val; render(); },
+  'task-cat-new': () => openModal({
+    title: 'Add task category', submitLabel: 'Add category',
+    body: field('Category name', inp('label', '', 'required maxlength="60" placeholder="e.g. Garden"')),
+    onSubmit: fd => {
+      const label = String(fd.get('label') || '').trim();
+      if (!label) { toast('Enter a category name', 'error'); return false; }
+      if (taskCategories().some(([, name]) => name.toLowerCase() === label.toLowerCase())) { toast('That category already exists', 'error'); return false; }
+      state.taskCats.push(touch({ id: uid(), label })); commit(); toast('Category added');
+    }
+  }),
   'tasks-tab': el => { ui.tasksTab = el.dataset.val; if (route() === 'tasks') render(); else location.hash = '#/tasks'; },
   'tasks-clear-done': () => confirmModal('Remove all completed tasks?', () => { state.tasks = state.tasks.filter(x => !x.done); commit(); }, { yesLabel: 'Clear' }),
 
@@ -28,6 +38,14 @@ const ACTIONS = {
   'cl-collapse': el => { ui.clCollapsed[el.dataset.id] = !ui.clCollapsed[el.dataset.id]; render(); },
   'cl-toggle-item': el => { const c = findList(el); const i = c && byId(c.items, el.dataset.item); if (!i) return; i.done = !i.done; touch(c); commit(); },
   'cl-del-item': el => { const c = findList(el); if (!c) return; c.items = c.items.filter(i => i.id !== el.dataset.item); touch(c); commit(); },
+  'cl-move-item': el => {
+    const c = findList(el); if (!c) return;
+    const from = c.items.findIndex(i => i.id === el.dataset.item), to = from + Number(el.dataset.val);
+    if (from < 0 || !Number.isInteger(to) || to < 0 || to >= c.items.length) return;
+    [c.items[from], c.items[to]] = [c.items[to], c.items[from]];
+    focusAfterRender = `[data-action="cl-move-item"][data-id="${c.id}"][data-item="${el.dataset.item}"][data-val="${el.dataset.val}"]`;
+    touch(c); commit();
+  },
   'cl-reset': el => { const c = findList(el); if (!c) return; c.items.forEach(i => { i.done = false; }); touch(c); commit(); toast('Checklist reset'); },
   'cl-dup': el => { const c = findList(el); if (!c) return; const copy = touch({ id: uid(), title: `${c.title} – ${fmtDate(todayStr(), { day: 'numeric', month: 'short' })}`, reusable: false, items: c.items.map(i => ({ id: uid(), text: i.text, done: false })) }); state.checklists.unshift(copy); commit(); toast('New checklist created from template'); },
   'cl-delete': el => confirmModal('Delete this checklist and all its items?', () => { state.checklists = state.checklists.filter(x => x.id !== el.dataset.id); commit(); }),
@@ -54,6 +72,8 @@ const ACTIONS = {
   'xmas-import': () => importRecipientsForm(),
   'xmas-recipient-new': () => recipientForm(),
   'xmas-recipient-edit': el => recipientForm(el.dataset.id),
+  'xmas-toggle': el => { ui.xmasOpen[el.dataset.id] = !ui.xmasOpen[el.dataset.id]; render(); },
+  'xmas-complete': el => { const r = findRecipient(el); if (!r) return; r.complete = !recipientDone(r); touch(r); commit(); },
   'xmas-recipient-delete': el => { const r = findRecipient(el); if (r) confirmModal(`Remove ${esc(r.name)} and their ${r.gifts.length} gift(s) from Christmas ${state.christmas.year}?`, () => { state.christmas.recipients = state.christmas.recipients.filter(x => x.id !== r.id); commit(); }, { yesLabel: 'Remove' }); },
   'xmas-gift-new': el => xmasGiftForm(el.dataset.id || null),
   'xmas-gift-edit': el => xmasGiftForm(el.dataset.id, el.dataset.item),
@@ -67,7 +87,7 @@ const ACTIONS = {
       c.recipients.forEach(r => {
         const p = r.personId ? byId(state.people, r.personId) : null;
         if (p) { r.gifts.filter(g => XMAS_IDX[g.status] >= XMAS_BOUGHT_IDX).forEach(g => p.history.push({ id: uid(), year: c.year, occasion: 'Christmas', gift: g.title, price: num(g.price), notes: '' })); touch(p); }
-        r.gifts = []; touch(r);
+        r.gifts = []; r.complete = false; touch(r);
       });
       c.year += 1; commit(); toast(`Ready for Christmas ${c.year} 🎄`);
     }, { title: `Start Christmas ${c.year + 1}?`, yesLabel: 'Archive & start', danger: false });
@@ -179,6 +199,11 @@ const ACTIONS = {
 };
 
 const FORMS = {
+  'look-ahead': fd => {
+    const days = Number(fd.get('days'));
+    if (!Number.isInteger(days) || days < 1 || days > 365) { toast('Enter a number of days from 1 to 365', 'error'); return; }
+    state.lookAheadDays = days; commit(); toast('Reminder window saved');
+  },
   'csv-apply': fd => {
     const S = csvSession; if (!S) return;
     const picks = fd.getAll('pick').map(Number);
@@ -294,4 +319,3 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal-root').innerHTML) closeModal(); });
-

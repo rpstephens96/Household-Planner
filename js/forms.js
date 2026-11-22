@@ -7,7 +7,7 @@ function taskForm(id) {
     body: `${field('Task', inp('title', t?.title, 'required placeholder="What needs doing?"'))}
       <div class="grid grid-cols-2 gap-3">${field('Due date', inp('due', t?.due, 'type="date"'))}
       ${field('Priority', sel('priority', Object.entries(PRIORITIES).map(([k, v]) => [k, v.label]), t?.priority || 'medium'))}</div>
-      ${field('Category', sel('category', Object.entries(TASK_CATS), t?.category || 'general'))}
+      ${field('Category', sel('category', taskCategories(), t?.category || 'general'))}
       ${field('Notes', ta('notes', t?.notes, 'placeholder="Optional"'))}`,
     onSubmit: fd => {
       const data = { title: fd.get('title').trim(), due: fd.get('due') || '', priority: fd.get('priority'), category: fd.get('category'), notes: fd.get('notes').trim() };
@@ -368,4 +368,3 @@ function billsPotForm() {
     onSubmit: fd => { const bb = fin().billsPot; bb.name = String(fd.get('name') || '').trim() || bb.name; bb.balance = num(fd.get('balance')); bb.updatedAt = Date.now(); commit(); }
   });
 }
-
